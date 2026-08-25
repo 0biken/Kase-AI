@@ -365,6 +365,50 @@ CREATE TABLE "FindingRelation" (
     CONSTRAINT "FindingRelation_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "ApiToken" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "displayPrefix" TEXT NOT NULL,
+    "role" TEXT NOT NULL,
+    "createdBy" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "lastUsedAt" TIMESTAMP(3),
+    "expiresAt" TIMESTAMP(3),
+    "revokedAt" TIMESTAMP(3),
+
+    CONSTRAINT "ApiToken_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "ProjectMember" (
+    "userId" TEXT NOT NULL,
+    "projectId" TEXT NOT NULL,
+    "role" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "ProjectMember_pkey" PRIMARY KEY ("userId","projectId")
+);
+
+-- CreateTable
+CREATE TABLE "AuditTrailEvent" (
+    "id" TEXT NOT NULL,
+    "projectId" TEXT,
+    "actorType" TEXT NOT NULL,
+    "actorId" TEXT,
+    "action" TEXT NOT NULL,
+    "resourceType" TEXT,
+    "resourceId" TEXT,
+    "diff" JSONB,
+    "metadata" JSONB,
+    "outcome" TEXT NOT NULL,
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "AuditTrailEvent_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "Project_slug_key" ON "Project"("slug");
 
@@ -394,6 +438,21 @@ CREATE INDEX "FindingRelation_toFindingId_idx" ON "FindingRelation"("toFindingId
 
 -- CreateIndex
 CREATE UNIQUE INDEX "FindingRelation_fromFindingId_toFindingId_kind_key" ON "FindingRelation"("fromFindingId", "toFindingId", "kind");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "ApiToken_tokenHash_key" ON "ApiToken"("tokenHash");
+
+-- CreateIndex
+CREATE INDEX "ApiToken_projectId_idx" ON "ApiToken"("projectId");
+
+-- CreateIndex
+CREATE INDEX "ProjectMember_projectId_idx" ON "ProjectMember"("projectId");
+
+-- CreateIndex
+CREATE INDEX "AuditTrailEvent_projectId_createdAt_idx" ON "AuditTrailEvent"("projectId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "AuditTrailEvent_action_createdAt_idx" ON "AuditTrailEvent"("action", "createdAt");
 
 -- AddForeignKey
 ALTER TABLE "Project" ADD CONSTRAINT "Project_organizationId_fkey" FOREIGN KEY ("organizationId") REFERENCES "Organization"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -466,4 +525,13 @@ ALTER TABLE "FindingEvidence" ADD CONSTRAINT "FindingEvidence_findingId_fkey" FO
 
 -- AddForeignKey
 ALTER TABLE "FindingEvidence" ADD CONSTRAINT "FindingEvidence_evidenceId_fkey" FOREIGN KEY ("evidenceId") REFERENCES "Evidence"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ApiToken" ADD CONSTRAINT "ApiToken_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ProjectMember" ADD CONSTRAINT "ProjectMember_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "ProjectMember" ADD CONSTRAINT "ProjectMember_projectId_fkey" FOREIGN KEY ("projectId") REFERENCES "Project"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

@@ -8,7 +8,7 @@ generator client {
 }
 
 model Project {
-  id                  String   @id @default(uuid())
+  id                  String   @id
   organizationId      String
   name                String
   slug                String   @unique
@@ -17,6 +17,8 @@ model Project {
 
   organization     Organization @relation(fields: [organizationId], references: [id])
   gatePolicies     GatePolicy[]
+  apiTokens        ApiToken[]
+  members          ProjectMember[]
   repositories     Repository[]
   targets          Target[]
   scopePolicies    ScopePolicy[]
@@ -27,7 +29,7 @@ model Project {
 }
 
 model Repository {
-  id            String   @id @default(uuid())
+  id            String   @id
   projectId     String
   provider      String   // 'github'
   url           String
@@ -38,7 +40,7 @@ model Repository {
 }
 
 model Target {
-  id               String   @id @default(uuid())
+  id               String   @id
   projectId        String
   name             String   // "staging", "prod"
   baseUrl          String
@@ -51,7 +53,7 @@ model Target {
 }
 
 model ScopePolicy {
-  id                      String   @id @default(uuid())
+  id                      String   @id
   projectId               String
   allowedHosts            String[]
   deniedPaths             String[]
@@ -65,7 +67,7 @@ model ScopePolicy {
 }
 
 model Audit {
-  id                    String   @id @default(uuid())
+  id                    String   @id
   projectId             String
   mode                  String   // 'full' | 'smoke' | 'security' | 'regression'
   status                String   // 'queued' | 'running' | 'completed' | 'partial' | 'failed' | 'cancelled'
@@ -89,7 +91,7 @@ model Audit {
 }
 
 model BuildProvenance {
-  id                String   @id @default(uuid())
+  id                String   @id
   auditId           String
   commitSha         String?
   branch            String?
@@ -103,7 +105,7 @@ model BuildProvenance {
 }
 
 model AuditJob {
-  id          String    @id @default(uuid())
+  id          String   @id
   auditId     String
   kind        String    // 'recon' | 'blackbox_agent' | 'whitebox_agent' | 'tool' | 'correlate' | 'report'
   category    String?
@@ -119,7 +121,7 @@ model AuditJob {
 }
 
 model ToolExecution {
-  id            String   @id @default(uuid())
+  id            String   @id
   auditJobId    String
   tool          String
   toolVersion   String
@@ -135,7 +137,7 @@ model ToolExecution {
 }
 
 model Evidence {
-  id              String   @id @default(uuid())
+  id              String   @id
   auditId         String
   toolExecutionId String?
   tool            String
@@ -153,12 +155,12 @@ model Evidence {
 }
 
 model EndpointInventory {
-  id        String     @id @default(uuid())
+  id        String   @id
   endpoints Endpoint[]
 }
 
 model Endpoint {
-  id               String   @id @default(uuid())
+  id               String   @id
   inventoryId      String
   method           String
   pathTemplate     String
@@ -174,12 +176,12 @@ model Endpoint {
 }
 
 model CodeMap {
-  id           String         @id @default(uuid())
+  id           String   @id
   routeMappings RouteMapping[]
 }
 
 model RouteMapping {
-  id             String   @id @default(uuid())
+  id             String   @id
   codeMapId      String
   method         String
   pathTemplate   String
@@ -195,7 +197,7 @@ model RouteMapping {
 }
 
 model FindingIdentity {
-  id               String   @id @default(uuid())
+  id               String   @id
   projectId        String
   fingerprint      String   @unique
   status           String   // 'new' | 'open' | 'fixed' | 'verified' | 'regressed' | 'not_reproduced' | 'false_positive' | 'accepted_risk'
@@ -210,7 +212,7 @@ model FindingIdentity {
 }
 
 model Finding {
-  id               String   @id @default(uuid())
+  id               String   @id
   auditId          String
   identityId       String
   origin           String   // 'blackbox' | 'whitebox' | 'tool' | 'correlated'
@@ -238,7 +240,7 @@ model Finding {
 }
 
 model SourceLocation {
-  id              String   @id @default(uuid())
+  id              String   @id
   findingId       String
   file            String
   enclosingSymbol String
@@ -251,7 +253,7 @@ model SourceLocation {
 }
 
 model Correlation {
-  id                     String   @id @default(uuid())
+  id                     String   @id
   auditId                String
   blackboxFindingId      String
   whiteboxFindingId      String?
@@ -267,7 +269,7 @@ model Correlation {
 }
 
 model PassingCheck {
-  id          String   @id @default(uuid())
+  id          String   @id
   auditId     String
   category    String
   checkId     String
@@ -279,7 +281,7 @@ model PassingCheck {
 }
 
 model GateEvaluation {
-  id                    String   @id @default(uuid())
+  id                    String   @id
   auditId               String
   gatePolicyId          String
   gatePolicyVersion     Int
@@ -294,7 +296,7 @@ model GateEvaluation {
 }
 
 model Waiver {
-  id              String   @id @default(uuid())
+  id              String   @id
   projectId       String
   fingerprint     String
   reason          String
@@ -308,7 +310,7 @@ model Waiver {
 }
 
 model Suppression {
-  id          String   @id @default(uuid())
+  id          String   @id
   projectId   String
   fingerprint String
   markedBy    String
@@ -328,7 +330,7 @@ model Suppression {
 // ---------------------------------------------------------------------------
 
 model Organization {
-  id        String   @id @default(uuid())
+  id        String   @id
   name      String
   slug      String   @unique
   createdAt DateTime @default(now())
@@ -338,19 +340,20 @@ model Organization {
 }
 
 model User {
-  id             String   @id @default(uuid())
+  id             String   @id
   organizationId String
   email          String   @unique
   name           String?
   createdAt      DateTime @default(now())
 
   organization   Organization @relation(fields: [organizationId], references: [id])
+  memberships    ProjectMember[]
 
   @@index([organizationId])
 }
 
 model GatePolicy {
-  id          String   @id @default(uuid())
+  id          String   @id
   projectId   String
   version     Int      @default(1)
   name        String
@@ -387,7 +390,7 @@ model FindingEvidence {
 // Dedup relationships produced by the three-level matcher. POSSIBLE_MATCH
 // rows are the human triage queue and must not auto-resolve.
 model FindingRelation {
-  id            String   @id @default(uuid())
+  id            String   @id
   fromFindingId String
   toFindingId   String
   kind          String   // 'match' | 'possible_match' | 'correlated_with'
@@ -396,4 +399,78 @@ model FindingRelation {
 
   @@unique([fromFindingId, toFindingId, kind])
   @@index([toFindingId])
+}
+
+// ---------------------------------------------------------------------------
+// Credentials, membership, and audit trail
+//
+// None of these appear in 03-data-model, but all three are load-bearing for
+// 14-api §2 and 17-security §9. Adding them here and to the doc together.
+// ---------------------------------------------------------------------------
+
+/// A long-lived credential for CLI/CI, scoped to exactly one project
+/// (14-api §2). The plaintext is shown once at creation and never stored.
+model ApiToken {
+  id            String    @id
+  projectId     String
+  name          String
+  /// SHA-256 of the plaintext. Unique so a collision is a constraint error
+  /// rather than an ambiguous lookup.
+  tokenHash     String    @unique
+  /// Leading chars of the plaintext, for listing tokens without revealing
+  /// them. Display only — never used for lookup.
+  displayPrefix String
+  role          String    // 'viewer' | 'operator' | 'approver' | 'admin'
+  createdBy     String
+  createdAt     DateTime  @default(now())
+  lastUsedAt    DateTime?
+  expiresAt     DateTime?
+  /// Revocation is a timestamp, not a row delete: audit-trail entries
+  /// referencing this token must keep resolving (17-security §9).
+  revokedAt     DateTime?
+
+  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+/// Per-project role for a session user.
+///
+/// 14-api §2 puts the role on the *token*, which leaves browser users with no
+/// derivable per-project role — User has no project link at all. This closes
+/// that gap so ProjectScopeGuard can authorize both credential types.
+model ProjectMember {
+  userId    String
+  projectId String
+  role      String   // 'viewer' | 'operator' | 'approver' | 'admin'
+  createdAt DateTime @default(now())
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@id([userId, projectId])
+  @@index([projectId])
+}
+
+/// Append-only audit trail (17-security §9): authn/authz decisions, project
+/// and policy changes with diffs, scope denials, evidence access, secret
+/// lifecycle. Retained indefinitely — there is no delete path by design.
+model AuditTrailEvent {
+  id           String   @id
+  /// Nullable: a failed authentication has no project yet, but must still be
+  /// recorded.
+  projectId    String?
+  actorType    String   // 'user' | 'token' | 'system'
+  actorId      String?
+  action       String   // e.g. 'project.update', 'auth.denied', 'scope.denied'
+  resourceType String?
+  resourceId   String?
+  /// Before/after for mutations. §9 requires policy changes carry diffs.
+  diff         Json?
+  metadata     Json?
+  outcome      String   // 'allowed' | 'denied' | 'error'
+  createdAt    DateTime @default(now())
+
+  @@index([projectId, createdAt])
+  @@index([action, createdAt])
 }

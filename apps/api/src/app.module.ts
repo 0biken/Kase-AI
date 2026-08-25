@@ -7,10 +7,12 @@ import { EvidenceModule } from './evidence/evidence.module';
 import { CorrelationModule } from './correlation/correlation.module';
 import { AssuranceModule } from './assurance/assurance.module';
 import { QueueModule } from './queue/queue.module';
+import { PrismaModule } from './prisma/prisma.module';
 import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
+    PrismaModule,
     QueueModule,
     StorageModule,
     OrchestratorModule,

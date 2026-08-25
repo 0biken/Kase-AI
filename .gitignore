@@ -7,3 +7,6 @@ __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
+
+# Machine-local Claude Code settings (permissions etc.) — not shared
+.claude/settings.local.json
