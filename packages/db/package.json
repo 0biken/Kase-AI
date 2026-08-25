@@ -4,7 +4,13 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "build": "prisma generate"
+    "build": "prisma generate --schema schema.prisma",
+    "generate": "prisma generate --schema schema.prisma",
+    "migrate:deploy": "prisma migrate deploy --schema schema.prisma",
+    "migrate:dev": "prisma migrate dev --schema schema.prisma",
+    "migrate:status": "prisma migrate status --schema schema.prisma",
+    "validate": "prisma validate --schema schema.prisma",
+    "studio": "prisma studio --schema schema.prisma"
   },
   "dependencies": {
     "@prisma/client": "^5.10.0"
