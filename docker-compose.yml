@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kase
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: kase
+    ports:
+      - "5432:5432"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+
+  fixture:
+    image: node:22-alpine
+    working_dir: /app
+    volumes:
+      - ./fixtures/vulnerable-app:/app
+    command: sh -c "npm install && npx tsx main.ts"
+    ports:
+      - "3001:3000"

@@ -1,0 +1,9 @@
+{
+  "name": "kase-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm --filter @kase/api run start:dev",
+    "build": "pnpm -r run build"
+  }
+}
