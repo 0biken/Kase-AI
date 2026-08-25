@@ -1,8 +1,15 @@
 packages:
   - 'apps/*'
   - 'packages/*'
-allowBuilds:
-  '@prisma/client': set this to true or false
-  '@prisma/engines': set this to true or false
-  prisma: set this to true or false
-  unrs-resolver: set this to true or false
+  # The vulnerable fixture is a real workspace package: the correlation spike
+  # imports it directly, and docker-compose runs it as a service. Without this
+  # its dependencies never get linked and the spike cannot boot it.
+  - 'fixtures/*'
+
+# Packages whose install scripts are required. Prisma cannot generate a client
+# without its postinstall; unrs-resolver ships a native binding used by eslint.
+onlyBuiltDependencies:
+  - '@prisma/client'
+  - '@prisma/engines'
+  - prisma
+  - unrs-resolver

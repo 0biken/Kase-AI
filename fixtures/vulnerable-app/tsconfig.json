@@ -11,8 +11,7 @@
     "strict": false,
     "strictNullChecks": false,
     "resolveJsonModule": true,
-    "baseUrl": ".",
     "types": ["node"]
   },
-  "include": ["src/**/*.ts", "../../fixtures/vulnerable-app/**/*.ts"]
+  "include": ["**/*.ts"]
 }

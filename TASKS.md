@@ -4,11 +4,11 @@ Executable form of [19 — Roadmap](docs/19-roadmap/README.md). Ordered by depen
 
 **Legend:** `[x]` done · `[~]` partially done · `[ ]` not started · **⚠** blocks other work
 
-**130 tasks, 10 done.** Counts include milestone exit criteria, which are the real gates.
+**130 tasks, 8 done, 2 partial.** Counts include milestone exit criteria, which are the real gates.
 
 | | Phase 0 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | Invariants |
 |---|---|---|---|---|---|---|---|---|---|
-| Done | 4 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Done | 4 | 4 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Total | 15 | 16 | 18 | 9 | 15 | 14 | 16 | 19 | 8 |
 
 ---
@@ -41,10 +41,10 @@ Non-code work that blocks code. Start the legal item this week; it has the longe
 
 ### Platform
 - [x] NestJS API scaffold with module boundaries matching the five subsystems
-- [x] Prisma schema from [03 — Data Model](docs/03-data-model/README.md), migrations committed
-- [x] BullMQ + Redis wiring, queue topology, concurrency caps from [02 §7](docs/02-stack/README.md#7-concurrency-and-resource-defaults)
-- [x] MinIO/S3 client, bucket layout, content-addressed paths
-- [x] Docker Compose: Postgres, Redis, MinIO, fixture target
+- [~] Prisma schema from [03 — Data Model](docs/03-data-model/README.md) — schema validates and covers 26 models; **migrations still not generated** (needs a running Postgres)
+- [~] BullMQ + Redis wiring, queue topology, concurrency caps from [02 §7](docs/02-stack/README.md#7-concurrency-and-resource-defaults) — connection + retries wired and compiling; **concurrency caps and job timeouts still absent**
+- [x] MinIO/S3 client, bucket layout, content-addressed paths — bucket now created by a `minio-init` service
+- [x] Docker Compose: Postgres, Redis, MinIO, fixture target — volumes, healthchecks, and a working fixture entrypoint
 
 ### Entities and auth
 - [ ] CRUD for Project, Repository, Target, ScopePolicy
