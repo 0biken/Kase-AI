@@ -4,11 +4,11 @@ Executable form of [19 — Roadmap](docs/19-roadmap/README.md). Ordered by depen
 
 **Legend:** `[x]` done · `[~]` partially done · `[ ]` not started · **⚠** blocks other work
 
-**130 tasks, 10 done.** Counts include milestone exit criteria, which are the real gates.
+**130 tasks, 11 done.** Counts include milestone exit criteria, which are the real gates.
 
 | | Phase 0 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | Invariants |
 |---|---|---|---|---|---|---|---|---|---|
-| Done | 4 | 6 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Done | 4 | 7 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Total | 15 | 16 | 18 | 9 | 15 | 14 | 16 | 19 | 8 |
 
 ---
@@ -47,7 +47,7 @@ Non-code work that blocks code. Start the legal item this week; it has the longe
 - [x] Docker Compose: Postgres, Redis, MinIO, fixture target — volumes, healthchecks, and a working fixture entrypoint
 
 ### Entities and auth
-- [ ] CRUD for Project, Repository, Target, ScopePolicy
+- [x] CRUD for Project, Repository, Target, ScopePolicy — ULIDs, RFC 9457 errors, cursor pagination, audit trail with diffs; 112 tests
 - [ ] Auth.js in Next, JWT verification in NestJS, `ProjectScopeGuard`
 - [ ] Project API tokens for CLI/CI, hashed at rest
 - [ ] Secret storage with envelope encryption; rotation and revocation as API operations

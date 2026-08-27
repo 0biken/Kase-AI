@@ -7,12 +7,13 @@ Entities, relationships, and the schemas that constitute the system of record.
 ## 1. Entity map
 
 ```
-User
 Organization
+ ├── User ─── ProjectMember (per-project role)
  └── Project
       ├── Repository
       ├── Target
       ├── ScopePolicy
+      ├── ApiToken       (CLI/CI credential, hashed at rest)
       ├── Integration ─── JiraIssue
       ├── GatePolicy
       ├── Waiver
@@ -35,6 +36,8 @@ Organization
            ├── PassingCheck
            ├── Report
            └── GateEvaluation
+
+AuditTrailEvent  (append-only; spans all of the above, no parent)
 ```
 
 Two entities deserve attention because they are easy to get wrong:
@@ -102,6 +105,67 @@ Enforced on every outbound request. See [17 — Security §3](../17-security/REA
   authorizationAttestedAt: DateTime
 }
 ```
+
+### ProjectMember
+
+Grants a session user a role on one project. `14 — API §2` puts the role on the *token* for CLI/CI callers, which leaves browser users with no derivable per-project role — this closes that gap. `ProjectScopeGuard` requires a row here for any session principal.
+
+```ts
+{
+  userId: string
+  projectId: string
+  role: 'viewer' | 'operator' | 'approver' | 'admin'
+  createdAt: DateTime
+}                               // composite PK: (userId, projectId)
+```
+
+### ApiToken
+
+The CLI/CI credential, presented as `Authorization: Bearer kase_...`.
+
+```ts
+{
+  id: string
+  projectId: string             // a token is scoped to exactly one project
+  name: string
+  tokenHash: string             // SHA-256 of the plaintext, unique
+  displayPrefix: string         // leading chars, for listing; never for lookup
+  role: 'viewer' | 'operator' | 'approver' | 'admin'
+  createdBy: string
+  createdAt: DateTime
+  lastUsedAt: DateTime | null
+  expiresAt: DateTime | null
+  revokedAt: DateTime | null
+}
+```
+
+**SHA-256, not a password hash.** Tokens are high-entropy random values, so brute force is infeasible and a memory-hard hash buys nothing while adding latency to a 600 req/min path ([14 §10](../14-api/README.md)).
+
+**Revocation is a timestamp, not a delete.** Audit-trail entries referencing a token must keep resolving ([17 §9](../17-security/README.md)).
+
+The plaintext is returned exactly once, at creation. Afterwards only `displayPrefix` is ever shown.
+
+### AuditTrailEvent
+
+Append-only, retained indefinitely, per [17 — Security §9](../17-security/README.md). Records authn/authz decisions, project and policy changes **with diffs**, scope denials, evidence access, and secret lifecycle events (never values).
+
+```ts
+{
+  id: string
+  projectId: string | null      // null: a failed auth has no project yet
+  actorType: 'user' | 'token' | 'system'
+  actorId: string | null
+  action: string                // 'project.update', 'auth.denied', 'scope.denied'
+  resourceType: string | null
+  resourceId: string | null
+  diff: object | null           // before/after; §9 requires diffs on policy changes
+  metadata: object | null
+  outcome: 'allowed' | 'denied' | 'error'
+  createdAt: DateTime
+}
+```
+
+It deliberately has **no parent entity**. A denied authentication has no project, and an event that could not be written because its parent did not exist would be exactly the event worth keeping.
 
 ### Audit
 

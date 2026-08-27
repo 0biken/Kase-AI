@@ -83,6 +83,26 @@ POST /api/v1/projects
 
 `scopePolicy.authorizationAttestedBy` is mandatory. A project cannot be created without an attestation that the requester is authorized to test the target.
 
+### Repositories and targets
+
+The create payload above nests `repository` and `targets`, which covers project setup but leaves no way to add a target later without replacing the project. These sub-resources fill that gap, following the same `/projects/:id/<child>` shape as scope policies, gate policies, audits, and waivers:
+
+```http
+GET    /api/v1/projects/:id/repositories
+POST   /api/v1/projects/:id/repositories
+PATCH  /api/v1/projects/:id/repositories/:repositoryId
+DELETE /api/v1/projects/:id/repositories/:repositoryId
+
+GET    /api/v1/projects/:id/targets
+POST   /api/v1/projects/:id/targets
+PATCH  /api/v1/projects/:id/targets/:targetId
+DELETE /api/v1/projects/:id/targets/:targetId
+```
+
+These stay **fully nested** rather than collapsing to `/targets/:id` once the ID is known. The flatter shape is more conventional, but it drops the project from the path, and every such route then depends on `ProjectScopeGuard` loading the row to discover which project it belongs to. Keeping the project in the path means the scope check reads it directly and a missing resolver cannot fail open. The handler also verifies the child actually belongs to the project in the path, so a valid target ID under the wrong project is a 404, not a cross-tenant edit.
+
+Mutating a **production** target invalidates the project's authorization attestation and requires re-attestation before the next audit ([17 §3](../17-security/README.md#3-scope-validation)). Changing what is being tested invalidates the statement that testing it was authorized.
+
 ## 4. Scope and gate policies
 
 ```http
