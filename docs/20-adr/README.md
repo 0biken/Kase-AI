@@ -18,6 +18,7 @@ The decisions that changed the design, and why. Each records what was rejected a
 | [010](#adr-010--cut-ffuf-add-nuclei) | Cut ffuf, add nuclei | Accepted |
 | [011](#adr-011--the-skills-are-source-material-not-runtime) | The skills are source material, not runtime | Accepted |
 | [012](#adr-012--typescript-orchestrator-polyglot-tool-layer) | TypeScript orchestrator, polyglot tool layer | Accepted |
+| [013](#adr-013--rs256-sessions-sha-256-tokens-flat-roles-invite-only) | RS256 sessions, SHA-256 tokens, flat roles, invite-only | Accepted |
 
 ---
 
@@ -162,6 +163,26 @@ The decisions that changed the design, and why. Each records what was rejected a
 **Rejected.** Reimplementing tools in TypeScript, and treating containerization as an implementation detail. The worker images and their egress policy are the hard engineering in this stack; under-budgeting them is how the schedule slips.
 
 **Consequence.** Worker images are a first-class deliverable from M1, with pinned versions recorded on every `ToolExecution` so findings stay explainable after upgrades.
+
+---
+
+## ADR-013 — RS256 sessions, SHA-256 tokens, flat roles, invite-only
+
+**Context.** 02-stack §5 and 14-api §2 specify the auth *shape* — a single `AuthGuard` for two credential types, a `ProjectScopeGuard`, tokens "hashed at rest" — but not the algorithms, and there was no auth ADR. Four choices had to be made before any guard could be written.
+
+**Decision.**
+- **RS256, asymmetric.** Next.js signs the session JWT with a private key; Nest verifies with the public half only ([jwt-keys.ts](../../apps/api/src/auth/jwt-keys.ts) has no way to load a private key — that's deliberate, not an oversight). `algorithms: ['RS256']` is pinned explicitly in the verify call, not read from the token's own header, which is what stops the classic alg-confusion forgery (an attacker HMAC-signing with the — necessarily public — RSA public key, hoping a naive verifier trusts the header's claimed algorithm).
+- **SHA-256 for API tokens**, not a password hash. A Kase token is 30 bytes of CSPRNG output; brute force is already infeasible, so a memory-hard hash buys nothing and only adds latency on a path budgeted at 600 req/min (14 §10). The hash is looked up via a unique DB index, never compared byte-by-byte against attacker-supplied input, so there is no timing side-channel to defend against with a constant-time comparison either.
+- **Flat roles, not a hierarchy.** `viewer | operator | approver | admin` is checked by set membership everywhere (`RolesGuard`, [roles.ts](../../apps/api/src/auth/roles.ts)). 14 §2 keeps `approver` a peer of `operator` specifically so `require_separate_approver` on waivers holds; a rank comparison would silently let `admin` (or any role ranked above `approver`) satisfy an approver-only check, defeating the reason the role exists.
+- **Invite-only org provisioning.** An OAuth identity, by itself, never grants access — deferred to PR C, decided here because it shapes the auth model this PR builds on.
+
+**Rejected.**
+- HS256 with a shared secret — simpler, but a compromised API process could then mint a session for any user; RS256 means a compromised API can verify but never forge.
+- Argon2id / bcrypt for tokens — correct for low-entropy human passwords, wasted on high-entropy random tokens, and the wrong trade on a hot path.
+- A ranked role hierarchy — reads naturally but is the one design that quietly breaks `require_separate_approver`.
+- Domain-based auto-join (anyone with a `@company.com` email joins automatically) — rejected because Apple's private-relay addresses (`@privaterelay.appleid.com`) never match a corporate domain, and because it trusts the OAuth provider's email verification as an authorization decision rather than an identity claim.
+
+**Consequence.** A session user has no role on any project until a `ProjectMember` row exists. `POST /projects` therefore auto-enrolls its creator as that project's `admin` inside the same transaction ([projects.service.ts](../../apps/api/src/projects/projects.service.ts)) — without it, the user who just created a project would fail `ProjectScopeGuard` on every following request to it. Creating and listing projects (`POST`/`GET /projects`) are marked `@OrgScope()` rather than project-scoped, since a project cannot be project-scoped before it exists; only a session principal may call them; an API token — always scoped to one existing project — cannot.
 
 ---
 

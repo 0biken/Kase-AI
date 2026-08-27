@@ -46,7 +46,21 @@ Tokens are hashed at rest, scoped to one project, and carry a role (`viewer`, `o
 | `approver` | Approve waivers, mark false positives, accept risk |
 | `admin` | Manage projects, scope policies, gate policies, integrations |
 
-`approver` is separate from `operator` precisely so `require_separate_approver` on waivers is enforceable ([12 §5](../12-policy-gate/README.md#5-waivers)).
+`approver` is separate from `operator` precisely so `require_separate_approver` on waivers is enforceable ([12 §5](../12-policy-gate/README.md#5-waivers)). Roles are checked by set membership, never rank — `admin` does not implicitly satisfy an `approver`-only or `operator`-only route ([20 — ADR-013](../20-adr/README.md#adr-013--rs256-sessions-sha-256-tokens-flat-roles-invite-only)).
+
+### Managing tokens
+
+```http
+POST   /api/v1/projects/:id/tokens
+GET    /api/v1/projects/:id/tokens
+DELETE /api/v1/projects/:id/tokens/:tokenId
+```
+
+All three are `admin`-only — even listing, since a token's name and `displayPrefix` already say who can act as what on the project. The plaintext is returned exactly once, in the `POST` response; every later read shows only `displayPrefix` (the leading characters, e.g. `kase_ab3f`) alongside `role`, `createdAt`, `lastUsedAt`, and `expiresAt`. `DELETE` revokes rather than deletes — the row (and its `displayPrefix`) has to keep resolving for anything that already cited it in the audit trail ([17 §9](../17-security/README.md)).
+
+### Creating and listing projects
+
+`POST`/`GET /api/v1/projects` are organization-level: a project cannot be project-scoped before it exists, so `ProjectScopeGuard` treats them as a distinct case rather than resolving a project id. Only a session principal may call them — an API token is always scoped to one existing project (this section, above) and has no organization to act across. Any session user belonging to the organization may call either; v1 has no organization-level role beyond that, matching 17 §8 ("v1 is single-organization"). The user who creates a project is automatically enrolled as that project's first `admin`, in the same transaction as project creation — otherwise they would fail `ProjectScopeGuard` on their own project immediately afterward.
 
 ## 3. Projects
 

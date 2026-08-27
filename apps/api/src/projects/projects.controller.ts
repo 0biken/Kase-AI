@@ -11,7 +11,7 @@ import {
   Put,
   Query,
 } from '@nestjs/common';
-import { ProjectsService, Actor } from './projects.service';
+import { ProjectsService, type Actor } from './projects.service';
 import {
   CreateProjectDto,
   UpdateProjectDto,
@@ -22,24 +22,9 @@ import { TargetInputDto, UpdateTargetDto } from './dto/target.dto';
 import { PaginationQueryDto } from '../common/pagination';
 import { ProblemException } from '../common/problem-details';
 import { isId } from '../common/ids';
-
-/**
- * Placeholder principal.
- *
- * AuthGuard lands in PR B; until then every request is attributed to a system
- * actor bound to a bootstrap organization. This is deliberately a single
- * obvious seam rather than scattered `TODO`s — when the guard exists, this
- * function is replaced by reading `req.principal` and nothing else moves.
- *
- * Nothing here is reachable in a deployed configuration: the module is not
- * mounted without an organization present.
- */
-function actorFor(): Actor {
-  return {
-    type: 'system',
-    organizationId: process.env.KASE_BOOTSTRAP_ORG_ID,
-  };
-}
+import { CurrentActor } from '../auth/current-actor.decorator';
+import { OrgScope, ProjectScope } from '../auth/project-scope.decorator';
+import { Roles } from '../auth/roles.decorator';
 
 function assertProjectId(id: string): string {
   if (!isId('project', id)) {
@@ -48,19 +33,33 @@ function assertProjectId(id: string): string {
   return id;
 }
 
+/**
+ * `@ProjectScope('id')` at the class level covers every route below —
+ * every one of them is nested under `/:id`. `create` and `list` override it
+ * with `@OrgScope()`: a project cannot be project-scoped before it exists,
+ * and listing is inherently organization-wide.
+ *
+ * Reads carry no `@Roles()`, which means "any project member" — 14 §2 gives
+ * `viewer` read access, and ProjectScopeGuard already proved membership.
+ * Every mutation requires `admin`: 14 §2 puts "manage projects, scope
+ * policies, gate policies, integrations" under admin specifically.
+ */
 @Controller('projects')
+@ProjectScope('id')
 export class ProjectsController {
   constructor(private readonly projects: ProjectsService) {}
 
   @Post()
+  @OrgScope()
   @HttpCode(HttpStatus.CREATED)
-  create(@Body() dto: CreateProjectDto) {
-    return this.projects.create(dto, actorFor());
+  create(@Body() dto: CreateProjectDto, @CurrentActor() actor: Actor) {
+    return this.projects.create(dto, actor);
   }
 
   @Get()
-  list(@Query() query: PaginationQueryDto) {
-    const orgId = actorFor().organizationId;
+  @OrgScope()
+  list(@Query() query: PaginationQueryDto, @CurrentActor() actor: Actor) {
+    const orgId = actor.organizationId;
     if (!orgId) {
       throw new ProblemException('FORBIDDEN', 'No organization bound to this principal');
     }
@@ -73,14 +72,16 @@ export class ProjectsController {
   }
 
   @Patch(':id')
-  update(@Param('id') id: string, @Body() dto: UpdateProjectDto) {
-    return this.projects.update(assertProjectId(id), dto, actorFor());
+  @Roles('admin')
+  update(@Param('id') id: string, @Body() dto: UpdateProjectDto, @CurrentActor() actor: Actor) {
+    return this.projects.update(assertProjectId(id), dto, actor);
   }
 
   @Delete(':id')
+  @Roles('admin')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async remove(@Param('id') id: string) {
-    await this.projects.remove(assertProjectId(id), actorFor());
+  async remove(@Param('id') id: string, @CurrentActor() actor: Actor) {
+    await this.projects.remove(assertProjectId(id), actor);
   }
 
   // --------------------------------------------------------- scope policy
@@ -92,8 +93,13 @@ export class ProjectsController {
 
   /** PUT, not PATCH — 14-api §4 defines this as a full replace. */
   @Put(':id/scope-policy')
-  replaceScopePolicy(@Param('id') id: string, @Body() dto: ReplaceScopePolicyDto) {
-    return this.projects.replaceScopePolicy(assertProjectId(id), dto, actorFor());
+  @Roles('admin')
+  replaceScopePolicy(
+    @Param('id') id: string,
+    @Body() dto: ReplaceScopePolicyDto,
+    @CurrentActor() actor: Actor,
+  ) {
+    return this.projects.replaceScopePolicy(assertProjectId(id), dto, actor);
   }
 
   // ----------------------------------------------------------- repositories
@@ -104,27 +110,36 @@ export class ProjectsController {
   }
 
   @Post(':id/repositories')
+  @Roles('admin')
   @HttpCode(HttpStatus.CREATED)
-  createRepository(@Param('id') id: string, @Body() dto: RepositoryInputDto) {
-    return this.projects.createRepository(assertProjectId(id), dto, actorFor());
+  createRepository(
+    @Param('id') id: string,
+    @Body() dto: RepositoryInputDto,
+    @CurrentActor() actor: Actor,
+  ) {
+    return this.projects.createRepository(assertProjectId(id), dto, actor);
   }
 
   @Patch(':id/repositories/:repositoryId')
+  @Roles('admin')
   updateRepository(
     @Param('id') id: string,
     @Param('repositoryId') repositoryId: string,
     @Body() dto: UpdateRepositoryDto,
+    @CurrentActor() actor: Actor,
   ) {
-    return this.projects.updateRepository(assertProjectId(id), repositoryId, dto, actorFor());
+    return this.projects.updateRepository(assertProjectId(id), repositoryId, dto, actor);
   }
 
   @Delete(':id/repositories/:repositoryId')
+  @Roles('admin')
   @HttpCode(HttpStatus.NO_CONTENT)
   async removeRepository(
     @Param('id') id: string,
     @Param('repositoryId') repositoryId: string,
+    @CurrentActor() actor: Actor,
   ) {
-    await this.projects.removeRepository(assertProjectId(id), repositoryId, actorFor());
+    await this.projects.removeRepository(assertProjectId(id), repositoryId, actor);
   }
 
   // ---------------------------------------------------------------- targets
@@ -135,23 +150,31 @@ export class ProjectsController {
   }
 
   @Post(':id/targets')
+  @Roles('admin')
   @HttpCode(HttpStatus.CREATED)
-  createTarget(@Param('id') id: string, @Body() dto: TargetInputDto) {
-    return this.projects.createTarget(assertProjectId(id), dto, actorFor());
+  createTarget(@Param('id') id: string, @Body() dto: TargetInputDto, @CurrentActor() actor: Actor) {
+    return this.projects.createTarget(assertProjectId(id), dto, actor);
   }
 
   @Patch(':id/targets/:targetId')
+  @Roles('admin')
   updateTarget(
     @Param('id') id: string,
     @Param('targetId') targetId: string,
     @Body() dto: UpdateTargetDto,
+    @CurrentActor() actor: Actor,
   ) {
-    return this.projects.updateTarget(assertProjectId(id), targetId, dto, actorFor());
+    return this.projects.updateTarget(assertProjectId(id), targetId, dto, actor);
   }
 
   @Delete(':id/targets/:targetId')
+  @Roles('admin')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async removeTarget(@Param('id') id: string, @Param('targetId') targetId: string) {
-    await this.projects.removeTarget(assertProjectId(id), targetId, actorFor());
+  async removeTarget(
+    @Param('id') id: string,
+    @Param('targetId') targetId: string,
+    @CurrentActor() actor: Actor,
+  ) {
+    await this.projects.removeTarget(assertProjectId(id), targetId, actor);
   }
 }

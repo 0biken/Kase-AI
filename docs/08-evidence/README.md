@@ -102,6 +102,7 @@ Applied in addition, for secrets Kase does not know about:
 | JWTs | three-segment base64 |
 | Connection strings | `postgres://user:pass@...` |
 | Provider tokens | GitHub, Slack, Stripe prefixes |
+| Kase API tokens | `kase_...` — 14 §2 |
 
 ### Secret-scanner output is special-cased
 
