@@ -9,6 +9,7 @@ Entities, relationships, and the schemas that constitute the system of record.
 ```
 Organization
  ├── User ─── ProjectMember (per-project role)
+ ├── Invite            (pending; gates account creation)
  └── Project
       ├── Repository
       ├── Target
@@ -118,6 +119,27 @@ Grants a session user a role on one project. `14 — API §2` puts the role on t
   createdAt: DateTime
 }                               // composite PK: (userId, projectId)
 ```
+
+### Invite
+
+Gates account creation. Per [ADR-013](../20-adr/README.md#adr-013--rs256-sessions-sha-256-tokens-flat-roles-invite-only), signing in with Google, GitHub or Apple proves *who someone is*; it never proves they are allowed in. A `User` row is created only when a pending invite matches the provider's **verified** email.
+
+```ts
+{
+  id: string
+  email: string
+  organizationId: string
+  role: 'viewer' | 'operator' | 'approver' | 'admin'
+  projectIds: string[]          // enrolled on acceptance; empty is valid
+  invitedBy: string
+  expiresAt: DateTime
+  acceptedAt: DateTime | null
+  acceptedUserId: string | null // links the invite to the User it created
+  createdAt: DateTime
+}                               // unique: (email, organizationId)
+```
+
+Acceptance — creating the `User`, its `ProjectMember` rows, and marking the invite used — happens in **one transaction**. A user without their memberships, or an invite marked accepted with no user, are both states nothing else would repair.
 
 ### ApiToken
 

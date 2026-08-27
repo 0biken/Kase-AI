@@ -1,0 +1,66 @@
+{
+  "name": "@kase/web",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@kase/db": "workspace:*",
+    "@prisma/client": "^5.22.0",
+    "jose": "^4.15.9",
+    "next": "^16.3.3",
+    "next-auth": "5.0.0-beta.32",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "ulid": "^2.3.0"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "jest": "^30.0.0",
+    "ts-jest": "^29.2.5",
+    "typescript": "^5.7.3"
+  },
+  "jest": {
+    "moduleFileExtensions": [
+      "js",
+      "json",
+      "ts",
+      "tsx"
+    ],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)sx?$": [
+        "ts-jest",
+        {
+          "tsconfig": {
+            "module": "commonjs",
+            "moduleResolution": "node",
+            "allowJs": true,
+            "esModuleInterop": true,
+            "noEmit": false,
+            "jsx": "react-jsx",
+            "target": "ES2022",
+            "strict": true,
+            "skipLibCheck": true
+          }
+        }
+      ]
+    },
+    "transformIgnorePatterns": [
+      "/node_modules/(?!.*(next-auth|@auth))"
+    ],
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/$1"
+    },
+    "testEnvironment": "node"
+  }
+}

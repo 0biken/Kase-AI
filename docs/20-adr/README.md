@@ -182,6 +182,12 @@ The decisions that changed the design, and why. Each records what was rejected a
 - A ranked role hierarchy — reads naturally but is the one design that quietly breaks `require_separate_approver`.
 - Domain-based auto-join (anyone with a `@company.com` email joins automatically) — rejected because Apple's private-relay addresses (`@privaterelay.appleid.com`) never match a corporate domain, and because it trusts the OAuth provider's email verification as an authorization decision rather than an identity claim.
 
+**Consequence — provisioning.** Sign-in is gated on an `Invite` row matching the provider's *verified* email. Email verification is read per-provider, not generically: Google sends a boolean, Apple sends the **string** `"true"`/`"false"` (so a truthiness check treats `"false"` as verified), and GitHub's provider already resolves only primary-verified addresses. An unrecognised provider fails closed. Acceptance creates the `User`, its `ProjectMember` rows, and marks the invite used in one transaction.
+
+Providers are configured from `KASE_`-prefixed env and are **individually skippable**, so a deployment missing Apple credentials serves Google and GitHub rather than failing to boot — Apple's prerequisites (paid developer account, `.p8` key, a client secret that is itself a JWT expiring within 6 months, and no `localhost` redirect) are the ones most likely to be absent.
+
+GitHub sign-in requests `read:user user:email` only — deliberately **not** `repo`. Repository access is a separate credential (`Repository.credentialId`); bundling it into the login grant would give Kase read access to every private repository of everyone who signs in.
+
 **Consequence.** A session user has no role on any project until a `ProjectMember` row exists. `POST /projects` therefore auto-enrolls its creator as that project's `admin` inside the same transaction ([projects.service.ts](../../apps/api/src/projects/projects.service.ts)) — without it, the user who just created a project would fail `ProjectScopeGuard` on every following request to it. Creating and listing projects (`POST`/`GET /projects`) are marked `@OrgScope()` rather than project-scoped, since a project cannot be project-scoped before it exists; only a session principal may call them; an API token — always scoped to one existing project — cannot.
 
 ---
