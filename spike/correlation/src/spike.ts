@@ -8,7 +8,14 @@ import { probeIdor, replay, resolveProvenance } from './blackbox';
 import { correlate } from './correlate';
 import { BuildProvenance } from './types';
 
-const TSCONFIG = path.join(__dirname, '..', 'tsconfig.json');
+/**
+ * The fixture lives at the repo root (fixtures/vulnerable-app), shared with
+ * docker-compose, rather than inside this spike. Analysis is rooted at the
+ * fixture's OWN tsconfig so reported paths stay clean — `invoices/…` rather
+ * than a chain of `../../..` — which also keeps fingerprints readable.
+ */
+const FIXTURE_DIR = path.join(__dirname, '..', '..', '..', 'fixtures', 'vulnerable-app');
+const TSCONFIG = path.join(FIXTURE_DIR, 'tsconfig.json');
 const COMMIT = 'a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0';
 
 const args = process.argv.slice(2);
@@ -34,7 +41,7 @@ function step(n: number, label: string) {
  * static rule but is no longer REACHABLE from the route, so it must not
  * correlate and must not block. Reachability is load-bearing, not decorative.
  */
-const CONTROLLER = path.join(__dirname, '..', 'fixture', 'invoices', 'invoice.controller.ts');
+const CONTROLLER = path.join(FIXTURE_DIR, 'invoices', 'invoice.controller.ts');
 
 function applyFix(): string {
   const original = fs.readFileSync(CONTROLLER, 'utf8');
@@ -74,7 +81,7 @@ async function main() {
 
   // ---------------------------------------------------------------- 1
   step(1, 'Boot fixture target');
-  const { bootFixture } = await import('../fixture/main');
+  const { bootFixture } = await import('../../../fixtures/vulnerable-app/main');
   const fixture = await bootFixture(noCommit ? undefined : COMMIT);
   console.log(`    ${DIM}listening on ${fixture.baseUrl}${RESET}`);
 

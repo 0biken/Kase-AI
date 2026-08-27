@@ -15,6 +15,8 @@ model Project {
   defaultGatePolicyId String
   createdAt           DateTime @default(now())
 
+  organization     Organization @relation(fields: [organizationId], references: [id])
+  gatePolicies     GatePolicy[]
   repositories     Repository[]
   targets          Target[]
   scopePolicies    ScopePolicy[]
@@ -147,6 +149,7 @@ model Evidence {
   metadata        Json
 
   audit           Audit    @relation(fields: [auditId], references: [id])
+  findingEvidence FindingEvidence[]
 }
 
 model EndpointInventory {
@@ -227,11 +230,11 @@ model Finding {
   confidenceBand   String   // 'high' | 'medium' | 'low'
   aiGenerated      Boolean
   gateEligible     Boolean
-  evidenceIds      String[]
 
   audit            Audit           @relation(fields: [auditId], references: [id])
   identity         FindingIdentity @relation(fields: [identityId], references: [id])
   sourceLocations  SourceLocation[]
+  findingEvidence  FindingEvidence[]
 }
 
 model SourceLocation {
@@ -313,4 +316,84 @@ model Suppression {
   createdAt   DateTime @default(now())
 
   project     Project  @relation(fields: [projectId], references: [id])
+}
+
+// ---------------------------------------------------------------------------
+// Identity and policy
+//
+// Project carries organizationId and defaultGatePolicyId. Without these models
+// both were dangling strings with no referent, and defaultGatePolicyId was
+// non-nullable — meaning no Project could be inserted without inventing an ID
+// that pointed at nothing.
+// ---------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  createdAt DateTime @default(now())
+
+  users     User[]
+  projects  Project[]
+}
+
+model User {
+  id             String   @id @default(uuid())
+  organizationId String
+  email          String   @unique
+  name           String?
+  createdAt      DateTime @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+}
+
+model GatePolicy {
+  id          String   @id @default(uuid())
+  projectId   String
+  version     Int      @default(1)
+  name        String
+  // Only evidence-class-eligible findings may block — see ADR-002.
+  rules       Json
+  createdAt   DateTime @default(now())
+
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, version])
+  @@index([projectId])
+}
+
+// ---------------------------------------------------------------------------
+// Finding <-> Evidence join
+//
+// Replaces Finding.evidenceIds String[]. An array gives no referential
+// integrity and cannot answer "which findings cite this evidence?" — which is
+// exactly the query evidence-class gating needs.
+// ---------------------------------------------------------------------------
+
+model FindingEvidence {
+  findingId  String
+  evidenceId String
+  role       String   // 'primary' | 'supporting'
+
+  finding    Finding  @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+
+  @@id([findingId, evidenceId])
+  @@index([evidenceId])
+}
+
+// Dedup relationships produced by the three-level matcher. POSSIBLE_MATCH
+// rows are the human triage queue and must not auto-resolve.
+model FindingRelation {
+  id            String   @id @default(uuid())
+  fromFindingId String
+  toFindingId   String
+  kind          String   // 'match' | 'possible_match' | 'correlated_with'
+  confidenceBand String?
+  createdAt     DateTime @default(now())
+
+  @@unique([fromFindingId, toFindingId, kind])
+  @@index([toFindingId])
 }
