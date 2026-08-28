@@ -161,7 +161,7 @@ The CLI/CI credential, presented as `Authorization: Bearer kase_...`.
 }
 ```
 
-**SHA-256, not a password hash.** Tokens are high-entropy random values, so brute force is infeasible and a memory-hard hash buys nothing while adding latency to a 600 req/min path ([14 §10](../14-api/README.md)).
+**SHA-256, not a password hash.** Tokens are high-entropy random values, so brute force is infeasible and a memory-hard hash buys nothing while adding latency to a 600 req/min path ([14 §11](../14-api/README.md#11-rate-limits)).
 
 **Revocation is a timestamp, not a delete.** Audit-trail entries referencing a token must keep resolving ([17 §9](../17-security/README.md)).
 
@@ -346,10 +346,23 @@ Immutable. See [08](../08-evidence/README.md).
   fixPatch: string | null       // unified diff where available
   confidenceBand: 'high' | 'medium' | 'low'
   aiGenerated: boolean
-  gateEligible: boolean         // derived, see §3
+  gateEligible: boolean         // derived, see 09 §8
   sourceLocations: SourceLocation[]
-  evidenceIds: string[]
 }
+```
+
+Evidence is **not** an array on `Finding`. It is linked through the `FindingEvidence` join table below — an array gives no referential integrity and cannot answer "which findings cite this evidence?", which is the query evidence-class gating depends on. Correlation is likewise a separate entity, reached via `Correlation.blackboxFindingId` / `whiteboxFindingId`, not a field here. [09 §8](../09-findings/README.md#8-gate-eligibility) spells out both joins, because assuming either is a property of `Finding` makes the gate formula unimplementable.
+
+### FindingEvidence
+
+Joins findings to the evidence that substantiates them.
+
+```ts
+{
+  findingId: string
+  evidenceId: string
+  role: 'primary' | 'supporting'
+}                               // composite PK: (findingId, evidenceId)
 ```
 
 ### SourceLocation
@@ -487,11 +500,16 @@ Deliberately no `confidence >= 0.90` term. An LLM-emitted probability is not cal
 | Table | Index | Reason |
 |---|---|---|
 | `FindingIdentity` | `(projectId, fingerprint)` unique | Identity resolution on every ingest |
+| `FindingIdentity` | `(projectId, status, currentSeverity)` | Project overview counts ("3 critical · 8 high") in [16 §2](../16-web/README.md) |
 | `Finding` | `(auditId, category, severity)` | Report and dashboard queries |
+| `FindingEvidence` | `(evidenceId)` | Reverse lookup: which findings cite this evidence |
+| `Correlation` | `(blackboxFindingId)`, `(whiteboxFindingId)` | Gate eligibility resolves correlation per finding — [09 §8](../09-findings/README.md#8-gate-eligibility) |
 | `Evidence` | `(auditId, type)` | Report assembly |
 | `Endpoint` | `(inventoryId, method, pathTemplate)` unique | Inventory merge |
 | `ToolExecution` | `(auditJobId)` | Job drill-down |
 | `Waiver` | `(projectId, fingerprint, expiresAt)` | Gate evaluation and expiry warnings |
+
+The two correlation indexes are not optional. Gate evaluation resolves a correlation for every correlated finding in the audit; without them that is a sequential scan per finding, on the path that decides whether a build ships.
 
 ## 5. Retention
 

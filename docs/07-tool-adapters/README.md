@@ -185,9 +185,30 @@ Normalizes to `ruleId: cve.<id>` or `ghsa.<id>`, with the dependency path record
 
 Produces `RouteMapping[]` for the correlation engine. Detailed in [10 §3](../10-correlation/README.md#3-layer-1--deterministic-mapping).
 
-### 4.12 `k6` — load testing (v1.1)
+### 4.12 `k6` — load testing
 
-Deferred. Load testing against a customer target needs the rate-limit and authorization machinery to be mature, and its findings are rarely gate-blocking in an MVP.
+| | |
+|---|---|
+| Capability | `run_load_test` |
+| Evidence | `test_output` (k6 JSON summary), `metrics_timeseries` |
+| Egress | Target allowlist only |
+
+Promoted from v1.1 by [ADR-014](../20-adr/README.md#adr-014--k6-in-v1-behind-explicit-authorization). It was originally cut as the highest-incident-risk adapter, and that assessment still stands — it is admitted only because the containment below now exists.
+
+**k6 findings never block.** A load profile is not reproducible run-to-run, so k6 evidence is non-replayable, and [12 §3](../12-policy-gate/README.md#3-evidence-class-gating) is absolute about what that means: non-replayable evidence warns, it never blocks.
+
+An explicit SLO budget in the gate policy therefore changes *whether a finding is raised at all*, not whether it can block. Without a budget there is no threshold to breach and k6 reports metrics only; with one, a breach is a reported finding measured against a number the project committed to rather than one the tool invented. Either way the gate outcome is WARN.
+
+Safety rules, all orchestrator-enforced rather than adapter-enforced:
+
+| Rule | Enforcement |
+|---|---|
+| Disabled against `environment: 'production'` | Requires `destructiveAllowed` **and** a separate named attestation naming the target ([17 §3](../17-security/README.md#3-scope-validation)) |
+| Virtual users and duration capped | Ceilings from the gate policy; the adapter cannot raise its own limits |
+| Shares the audit's global RPS budget | A load test cannot exceed `maxRequestsPerSecond` — the same ceiling every other adapter obeys, counted globally so two concurrent audits do not sum to 2× the agreed rate |
+| Aborts on target error-rate spike | A target failing under load is a result, not a licence to keep pushing |
+
+The distinction from every other adapter: k6 deliberately *degrades the target*. That is why the caps live in the orchestrator, where the scope validator already sits, and not in the adapter that would benefit from raising them.
 
 ## 5. Evidence class summary
 
@@ -203,6 +224,7 @@ Which adapters produce evidence that can block a release:
 | `axe` | Yes | Yes (if policy includes a11y) |
 | `playwright` | No (screenshots/traces) | No — supporting evidence only |
 | `lighthouse` | No | Advisory unless explicit budget set |
+| `k6` | No (load profile is not reproducible run-to-run) | No — advisory only, even with an SLO budget |
 | `katana` | No | No — discovery only |
 
 See [12 §3](../12-policy-gate/README.md#3-evidence-class-gating).

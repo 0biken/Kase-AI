@@ -19,6 +19,7 @@ The decisions that changed the design, and why. Each records what was rejected a
 | [011](#adr-011--the-skills-are-source-material-not-runtime) | The skills are source material, not runtime | Accepted |
 | [012](#adr-012--typescript-orchestrator-polyglot-tool-layer) | TypeScript orchestrator, polyglot tool layer | Accepted |
 | [013](#adr-013--rs256-sessions-sha-256-tokens-flat-roles-invite-only) | RS256 sessions, SHA-256 tokens, flat roles, invite-only | Accepted |
+| [014](#adr-014--k6-in-v1-behind-explicit-authorization) | k6 in v1, behind explicit authorization | Accepted |
 
 ---
 
@@ -172,7 +173,7 @@ The decisions that changed the design, and why. Each records what was rejected a
 
 **Decision.**
 - **RS256, asymmetric.** Next.js signs the session JWT with a private key; Nest verifies with the public half only ([jwt-keys.ts](../../apps/api/src/auth/jwt-keys.ts) has no way to load a private key — that's deliberate, not an oversight). `algorithms: ['RS256']` is pinned explicitly in the verify call, not read from the token's own header, which is what stops the classic alg-confusion forgery (an attacker HMAC-signing with the — necessarily public — RSA public key, hoping a naive verifier trusts the header's claimed algorithm).
-- **SHA-256 for API tokens**, not a password hash. A Kase token is 30 bytes of CSPRNG output; brute force is already infeasible, so a memory-hard hash buys nothing and only adds latency on a path budgeted at 600 req/min (14 §10). The hash is looked up via a unique DB index, never compared byte-by-byte against attacker-supplied input, so there is no timing side-channel to defend against with a constant-time comparison either.
+- **SHA-256 for API tokens**, not a password hash. A Kase token is 30 bytes of CSPRNG output; brute force is already infeasible, so a memory-hard hash buys nothing and only adds latency on a path budgeted at 600 req/min (14 §11). The hash is looked up via a unique DB index, never compared byte-by-byte against attacker-supplied input, so there is no timing side-channel to defend against with a constant-time comparison either.
 - **Flat roles, not a hierarchy.** `viewer | operator | approver | admin` is checked by set membership everywhere (`RolesGuard`, [roles.ts](../../apps/api/src/auth/roles.ts)). 14 §2 keeps `approver` a peer of `operator` specifically so `require_separate_approver` on waivers holds; a rank comparison would silently let `admin` (or any role ranked above `approver`) satisfy an approver-only check, defeating the reason the role exists.
 - **Invite-only org provisioning.** An OAuth identity, by itself, never grants access — deferred to PR C, decided here because it shapes the auth model this PR builds on.
 
@@ -189,6 +190,32 @@ Providers are configured from `KASE_`-prefixed env and are **individually skippa
 GitHub sign-in requests `read:user user:email` only — deliberately **not** `repo`. Repository access is a separate credential (`Repository.credentialId`); bundling it into the login grant would give Kase read access to every private repository of everyone who signs in.
 
 **Consequence.** A session user has no role on any project until a `ProjectMember` row exists. `POST /projects` therefore auto-enrolls its creator as that project's `admin` inside the same transaction ([projects.service.ts](../../apps/api/src/projects/projects.service.ts)) — without it, the user who just created a project would fail `ProjectScopeGuard` on every following request to it. Creating and listing projects (`POST`/`GET /projects`) are marked `@OrgScope()` rather than project-scoped, since a project cannot be project-scoped before it exists; only a session principal may call them; an API token — always scoped to one existing project — cannot.
+
+---
+
+## ADR-014 — k6 in v1, behind explicit authorization
+
+**Context.** [19 §5](../19-roadmap/README.md) cut k6 from v1 on two grounds: *"rarely gate-blocking; highest incident risk of any adapter."* This ADR reverses that. It exists because the cut was a recorded decision, and reversing one without a record is the failure mode ADR-001 through ADR-013 were written to avoid.
+
+The second ground — incident risk — was never wrong and is not now dismissed. k6 remains the only adapter whose *purpose* is to degrade the target. What changed is that the containment it needed now exists rather than being hypothetical: the scope validator enforces a global RPS ceiling across concurrent audits ([17 §3](../17-security/README.md#3-scope-validation)), attestation is mandatory and expires, and `destructiveAllowed` already gates a separate class of dangerous operation with a named authorizer.
+
+The first ground — rarely gate-blocking — is answered by not letting it block at all. Evidence-class gating ([ADR-002](#adr-002--gate-on-evidence-class-not-confidence-score)) already decides this without a special case: a load profile is not reproducible run-to-run, so k6 evidence is non-replayable, and [12 §3](../12-policy-gate/README.md#3-evidence-class-gating) is absolute that non-replayable evidence warns and never blocks.
+
+**Decision.** Ship k6 in v1 as `run_load_test`, **advisory by default**, with every cap enforced by the orchestrator rather than the adapter:
+
+- Blocked against `environment: 'production'` unless `destructiveAllowed` **and** a separate attestation naming that target.
+- VU count and duration capped by gate policy; the adapter cannot raise its own ceiling.
+- Shares the audit's global RPS budget — a load test gets no exemption from the limit every other adapter obeys.
+- Aborts on a target error-rate spike.
+- Never gate-blocking. An SLO budget in the gate policy determines whether a finding is *raised*, not whether it can block.
+
+**Rejected.** Keeping it cut to v1.1 — defensible, and it was the prior decision, but the machinery the cut was waiting on is the machinery that now exists, so the deferral had stopped buying anything. Making an SLO breach gate-blocking — tempting, since a declared budget feels like a stated commitment, but it would carve an exception into ADR-002, and "only replayable evidence blocks" stops being a rule the moment it has exceptions. Letting the adapter own its own caps — the component that benefits from a higher ceiling is the wrong place to enforce one.
+
+**Consequence.** k6 output is `test_output` evidence, marked **not replayable**, so it can never satisfy the replayable-evidence clause in the gate formula ([09 §8](../09-findings/README.md#8-gate-eligibility)). Declaring an SLO budget makes a breach *reportable against a number the project committed to* rather than one the tool invented; it does not make the evidence replayable, and those are separate properties that are easy to conflate.
+
+This leaves `lighthouse` ([07 §4.6](../07-tool-adapters/README.md)) as the remaining adapter whose entry still reads "advisory unless the project explicitly opts in with a fixed budget" — phrasing that implies a blocking path §3 does not actually allow. Same conflation, pre-dating this ADR; flagged here rather than silently changed, since narrowing an existing adapter's semantics is its own decision.
+
+Production load testing now has two independent authorizations — `destructiveAllowed` and a target-specific attestation — which is deliberate friction. A load test against production that nobody explicitly authorized is the incident this ADR is accountable for preventing.
 
 ---
 

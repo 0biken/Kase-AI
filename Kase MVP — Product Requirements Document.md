@@ -56,7 +56,7 @@ Kase should become the intelligence layer between:
 The long-term vision is:
 
 ```text id="x9h6j3"
-                         QA FORGE
+                           KASE
                       AI QA PLATFORM
                            │
               ┌────────────┴────────────┐
@@ -168,8 +168,8 @@ The following are explicitly out of scope for MVP:
 - Unlimited load testing.
 - Distributed high-volume performance testing.
 - Full visual regression platform.
-- AI/LLM application evaluation.
-- Agentic application testing.
+- AI/LLM application evaluation — red-teaming chatbots, prompt-injection suites.
+- Testing applications that are *themselves* agentic. Kase uses agents to perform testing; it does not test agent frameworks. The distinction matters because the phrasing reads both ways.
 - Complete browser/device cloud.
 - Full compliance certification such as SOC 2 certification.
 
@@ -293,7 +293,7 @@ Runs:
 
 ```text id="8w5q9s"
                          ┌──────────────────────┐
-                         │       QA FORGE       │
+                         │         KASE         │
                          │       WEB/API        │
                          └──────────┬───────────┘
                                     │
@@ -886,9 +886,9 @@ MVP requirements:
 The MVP shall expose a CLI and/or CI action:
 
 ```text id="3n7y1t"
-qa-forge audit
-qa-forge regression
-qa-forge gate
+kase audit
+kase regression
+kase gate
 ```
 
 Example workflow:
@@ -1140,7 +1140,7 @@ QA engineers should be able to run Kase without the dashboard.
 ### Start audit
 
 ```bash
-qa-forge audit \
+kase audit \
   --project my-app \
   --url https://staging.example.com \
   --repo https://github.com/org/repo
@@ -1149,7 +1149,7 @@ qa-forge audit \
 ### Run specific mode
 
 ```bash
-qa-forge audit \
+kase audit \
   --project my-app \
   --mode security
 ```
@@ -1157,14 +1157,14 @@ qa-forge audit \
 ### Run regression
 
 ```bash
-qa-forge regression \
+kase regression \
   --project my-app
 ```
 
 ### Evaluate release gate
 
 ```bash
-qa-forge gate \
+kase gate \
   --audit <audit-id>
 ```
 

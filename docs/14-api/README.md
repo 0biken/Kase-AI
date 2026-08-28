@@ -206,6 +206,26 @@ PATCH /api/v1/findings/fnd_01H...
 
 Transitioning to `false_positive` creates a project-scoped `Suppression` keyed on the fingerprint, so the same noise does not return next run. Requires `approver`.
 
+### Suppressions
+
+The suppression store is readable and writable directly, not only as a side effect of a `false_positive` transition — otherwise there is no way to review what has been silenced, or to un-silence it.
+
+```http
+GET    /api/v1/projects/:id/suppressions
+POST   /api/v1/projects/:id/suppressions     # approver
+DELETE /api/v1/suppressions/:id              # approver — un-suppress
+```
+
+Deleting a suppression does not resurrect the old finding; the fingerprint simply stops being filtered, so the next audit that observes it reports it as `new`.
+
+### Passing checks
+
+```http
+GET /api/v1/audits/:id/passing-checks
+```
+
+`PassingCheck` is a first-class entity ([03 §2](../03-data-model/README.md), [ADR-009](../20-adr/README.md)) precisely so coverage is reportable: "we checked authz on these 14 endpoints and found nothing" is a different statement from "we did not check". Without this endpoint the dashboard's coverage view cannot distinguish them, which is the failure ADR-009 exists to prevent.
+
 ## 7. Waivers
 
 ```http
@@ -248,7 +268,41 @@ GET  /api/v1/audits/:id/gate               # last evaluation
 
 Gate response is the full explainable object from [12 §8](../12-policy-gate/README.md#8-gate-evaluation-output).
 
-## 10. Rate limits
+## 10. Integrations
+
+Configuration surface for [13 — Integrations](../13-integrations/README.md). All routes require `admin`.
+
+```http
+GET    /api/v1/projects/:id/integrations
+GET    /api/v1/integrations/:id
+PATCH  /api/v1/integrations/:id
+DELETE /api/v1/integrations/:id
+```
+
+Neither integration is created by a plain `POST` with a credential in the body, because neither issues credentials that way.
+
+### GitHub App installation
+
+```http
+GET  /api/v1/projects/:id/integrations/github/install-url
+GET  /api/v1/integrations/github/callback      # GitHub redirects here post-install
+```
+
+The install URL sends the admin to GitHub's own installation screen; the callback exchanges the `installation_id` for the record. Installation tokens are short-lived and resolved per job ([13 §1](../13-integrations/README.md#1-github)) — **no long-lived repository credential is ever stored**, so there is no endpoint that accepts one.
+
+### Jira 3LO
+
+```http
+GET  /api/v1/projects/:id/integrations/jira/authorize-url
+GET  /api/v1/integrations/jira/callback        # Atlassian redirects here
+PUT  /api/v1/integrations/:id/jira-config      # projectKey, issueType, mappings
+```
+
+The OAuth exchange happens server-side; the refresh token is encrypted at rest per [02 §4](../02-stack/README.md#4-secrets-management-is-a-first-class-requirement). `jira-config` is separated from the credential deliberately — editing a severity-field mapping is a routine change, and it should not require re-authorizing, or tempt anyone into a shape where the config write can also carry a credential.
+
+Both callbacks verify `state`. Credential values are never returned by any `GET`; a read shows connection status, scopes, and the account or installation identity only.
+
+## 11. Rate limits
 
 | Caller | Limit |
 |---|---|
@@ -258,7 +312,7 @@ Gate response is the full explainable object from [12 §8](../12-policy-gate/REA
 
 `429` returns `Retry-After`.
 
-## 11. Webhooks
+## 12. Webhooks
 
 ```http
 POST /api/v1/projects/:id/webhooks
