@@ -13,7 +13,8 @@
     "studio": "prisma studio --schema schema.prisma"
   },
   "dependencies": {
-    "@prisma/client": "^5.10.0"
+    "@prisma/client": "^5.10.0",
+    "ulid": "^2.3.0"
   },
   "devDependencies": {
     "prisma": "^5.10.0"
@@ -22,7 +23,19 @@
   "files": [
     "index.js",
     "index.d.ts",
+    "ids.js",
+    "ids.d.ts",
     "schema.prisma",
     "migrations"
-  ]
+  ],
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    },
+    "./ids": {
+      "types": "./ids.d.ts",
+      "default": "./ids.js"
+    }
+  }
 }

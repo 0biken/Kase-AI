@@ -337,6 +337,7 @@ model Organization {
 
   users     User[]
   projects  Project[]
+  invites   Invite[]
 }
 
 model User {
@@ -473,4 +474,32 @@ model AuditTrailEvent {
 
   @@index([projectId, createdAt])
   @@index([action, createdAt])
+}
+
+/// An invitation to join an Organization. ADR-013: an OAuth identity by
+/// itself never grants access — a successful handshake with Google, GitHub
+/// or Apple proves who someone is, not that they are allowed in. Sign-in
+/// requires a pending invite matching the provider's *verified* email.
+model Invite {
+  id             String    @id
+  email          String
+  organizationId String
+  /// Role granted on acceptance, for projects listed in `projectIds`.
+  role           String    // 'viewer' | 'operator' | 'approver' | 'admin'
+  /// Projects the invitee is enrolled into on acceptance. Empty is valid:
+  /// an org member with no project access yet.
+  projectIds     String[]
+  invitedBy      String
+  expiresAt      DateTime
+  acceptedAt     DateTime?
+  /// Set when accepted, so the trail links invite -> the User it created.
+  acceptedUserId String?
+  createdAt      DateTime  @default(now())
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  /// One live invite per email per org. Re-inviting an existing address
+  /// updates that row rather than racing two acceptances.
+  @@unique([email, organizationId])
+  @@index([email])
 }

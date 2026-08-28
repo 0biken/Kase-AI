@@ -4,11 +4,11 @@ Executable form of [19 — Roadmap](docs/19-roadmap/README.md). Ordered by depen
 
 **Legend:** `[x]` done · `[~]` partially done · `[ ]` not started · **⚠** blocks other work
 
-**130 tasks, 12 done.** Counts include milestone exit criteria, which are the real gates.
+**130 tasks, 13 done.** Counts include milestone exit criteria, which are the real gates.
 
 | | Phase 0 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | Invariants |
 |---|---|---|---|---|---|---|---|---|---|
-| Done | 4 | 8 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Done | 4 | 9 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Total | 15 | 16 | 18 | 9 | 15 | 14 | 16 | 19 | 8 |
 
 ---
@@ -48,7 +48,7 @@ Non-code work that blocks code. Start the legal item this week; it has the longe
 
 ### Entities and auth
 - [x] CRUD for Project, Repository, Target, ScopePolicy — ULIDs, RFC 9457 errors, cursor pagination, audit trail with diffs; 112 tests
-- [~] Auth.js in Next, JWT verification in NestJS, `ProjectScopeGuard` — Nest side done: single `AuthGuard` (RS256 JWT + `kase_` token), `ProjectScopeGuard` (deny-by-default resolver), `RolesGuard` (flat roles), 54 tests; **Auth.js in Next.js is a separate app and has not been started**
+- [x] Auth.js in Next, JWT verification in NestJS, `ProjectScopeGuard` — `apps/web` with GitHub/Google/Apple, invite-only provisioning, RS256 Next→Nest exchange; Nest side: single `AuthGuard`, deny-by-default `ProjectScopeGuard`, flat-role `RolesGuard`; 88 tests across both apps
 - [x] Project API tokens for CLI/CI, hashed at rest — SHA-256, `POST/GET/DELETE /projects/:id/tokens`, plaintext returned once, revoked not deleted
 - [ ] Secret storage with envelope encryption; rotation and revocation as API operations
 
