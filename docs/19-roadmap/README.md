@@ -130,7 +130,7 @@ That last check matters as much as the happy path — it proves the safety prope
 
 - Dashboard: projects, audit detail with SSE, findings, finding detail, gate, waivers, inventory
 - Jira integration with fingerprint-keyed dedup
-- `nuclei`, `gitleaks`, `deps`, `axe`, `lighthouse` adapters
+- `nuclei`, `gitleaks`, `deps`, `axe`, `lighthouse`, `k6` adapters — `k6` last, and only once the orchestrator-side caps in [ADR-014](../20-adr/README.md#adr-014--k6-in-v1-behind-explicit-authorization) are enforced and tested
 - Regression mode
 - Observability: metrics, traces, alerts, product-health dashboard
 
@@ -148,7 +148,7 @@ Dashboard · Jira · finding lifecycle and history · recon breadth (nuclei, git
 
 ### P2 — immediately post-v1
 
-Request-ID instrumented correlation mode · Express and Django route parsing · `gau` · k6 load testing · additional CI systems · visual regression · intelligent test selection · BrowserStack
+Request-ID instrumented correlation mode · Express and Django route parsing · `gau` · additional CI systems · visual regression · intelligent test selection · BrowserStack
 
 ## 5. Cut list, with reasons
 
@@ -156,7 +156,6 @@ Request-ID instrumented correlation mode · Express and Django route parsing · 
 |---|---|
 | **`ffuf`** | Highest request volume, WAF-tripping, ToS-risky, noisiest output. Needs a hard authorization gate and soft-404 calibration to be safe — more machinery than its v1 value ([06 §3](../06-recon/README.md#cut-from-v1--ffuf)) |
 | **`gau`** | Third-party egress and out-of-scope URL risk. Wait until the scope validator has production mileage |
-| **k6 load testing** | Rarely gate-blocking; highest incident risk of any adapter |
 | **Express route parsing** | Hardest framework, and the runtime dump solves it better. Do NestJS and FastAPI first |
 | **Multi-tenant governance** | Isolation primitives built in; the governance surface is not |
 | **Self-healing, visual regression, device farms** | Test-execution features. They do not test the correlation thesis |

@@ -6,7 +6,7 @@ import { createHash, randomBytes } from 'crypto';
  * SHA-256, not a password hash (bcrypt/argon2). Those exist to slow down
  * brute-forcing a *low-entropy* human password. A Kase token is 30 bytes of
  * CSPRNG output — brute force is already infeasible — so a slow hash buys
- * nothing and only adds latency on a path budgeted at 600 req/min (14 §10).
+ * nothing and only adds latency on a path budgeted at 600 req/min (14 §11).
  * This is the same reasoning GitHub and Stripe apply to their own tokens.
  *
  * There is deliberately no constant-time comparison here. The hash is looked

@@ -18,7 +18,7 @@ export interface SessionPrincipal {
    * with no project in scope (list/create) never sets this.
    */
   role?: Role;
-  /** 14 §10: session callers are rate-limited at 300 req/min. */
+  /** 14 §11: session callers are rate-limited at 300 req/min. */
   rateClass: 'session';
 }
 
@@ -28,7 +28,7 @@ export interface TokenPrincipal {
   /** An API token is scoped to exactly one project, always (14 §2). */
   projectId: string;
   role: Role;
-  /** 14 §10: token callers are rate-limited at 600 req/min. */
+  /** 14 §11: token callers are rate-limited at 600 req/min. */
   rateClass: 'token';
 }
 

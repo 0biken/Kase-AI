@@ -213,23 +213,23 @@ Merged findings retain every contributing artifact. Merging is presentation and 
 `FindingIdentity.status` is project-scoped and persists across audits.
 
 ```
-                    NEW
-                     |
-                     v
-                   OPEN <---------------------+
-                  /  |  \                     |
-                 /   |   \                    |
-                v    v    v                   |
-   NOT_REPRODUCED  FIXED  FALSE_POSITIVE      |
-                     |         |              |
-                     v         v              |
-                 VERIFIED   SUPPRESSED        |
-                     |                        |
-                     v                        |
-                 REGRESSED --------------------+
+                       NEW
+                        |
+                        v
+   +----------------> OPEN <------------------+
+   |                v   v   v                 |
+   |   NOT_REPRODUCED  FIXED  FALSE_POSITIVE  |
+   |         |           |          |         |
+   +---------+           v          v         |
+     reappears       VERIFIED  SUPPRESSED     |
+                         |                    |
+                         v                    |
+                     REGRESSED ---------------+
 
    ACCEPTED_RISK  <- from OPEN, by explicit decision
 ```
+
+`not_reproduced` is **not terminal**. If a later audit observes the finding again it returns to `open`. It is a "we did not see it this run" state, not a resolution — which is why it keeps blocking while it lasts. The only exits from it are back to `open` on reappearance, or forward to `fixed` when a regression check explicitly confirms the fix.
 
 | State | Meaning | Gate |
 |---|---|---|
@@ -271,13 +271,36 @@ Gate eligibility keys on **evidence class**, not on this band. The band drives r
 ```ts
 gateEligible =
      severity in policy.blockingSeverities
-  && evidence.some(e => e.replayable)
-  && (origin !== 'correlated' || correlation.verified)
+  && replayableEvidenceFor(finding.id).length > 0
+  && (origin !== 'correlated' || correlationFor(finding.id)?.verified === true)
   && !['false_positive', 'accepted_risk'].includes(identity.status)
   && !activeWaiverFor(fingerprint)
 ```
 
 Computed by the finding engine, enforced by the policy engine. See [12](../12-policy-gate/README.md).
+
+### Resolving the two lookups
+
+Neither input is a field on `Finding`; both are joins, and writing them as though they were properties is how this formula becomes unimplementable.
+
+**`replayableEvidenceFor(findingId)`** — `Finding` has no `evidenceIds` array. Evidence is linked through the `FindingEvidence` join table ([03 §2](../03-data-model/README.md#findingevidence)), so the check is over joined rows:
+
+```ts
+findingEvidence
+  .filter(fe => fe.findingId === finding.id)
+  .some(fe => fe.evidence.replayable)
+```
+
+**`correlationFor(findingId)`** — `Correlation` is a separate entity, not a field on `Finding`, and it references findings by **either** end of the pair:
+
+```ts
+Correlation where blackboxFindingId = finding.id
+                  OR whiteboxFindingId = finding.id
+```
+
+A correlated finding with no such row, or one whose `verified` is `false`, is **not** gate-eligible. That is the intended failure direction: an unverified correlation warns, it never blocks ([ADR-002](../20-adr/README.md), [ADR-003](../20-adr/README.md)).
+
+Both lookups sit on the gate's hot path, so both need supporting indexes — see [03 §4](../03-data-model/README.md#4-indexing-notes).
 
 ---
 
