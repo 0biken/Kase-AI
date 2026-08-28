@@ -10,12 +10,17 @@ import { QueueModule } from './queue/queue.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { StorageModule } from './storage/storage.module';
 import { AuditTrailModule } from './audit-trail/audit-trail.module';
+import { AuthModule } from './auth/auth.module';
 import { ProjectsModule } from './projects/projects.module';
+import { TokensModule } from './tokens/tokens.module';
 
 @Module({
   imports: [
     PrismaModule,
     AuditTrailModule,
+    // AuthModule registers the global guards — it must be imported before
+    // any module whose routes depend on being protected by them.
+    AuthModule,
     QueueModule,
     StorageModule,
     OrchestratorModule,
@@ -24,6 +29,7 @@ import { ProjectsModule } from './projects/projects.module';
     CorrelationModule,
     AssuranceModule,
     ProjectsModule,
+    TokensModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -136,6 +136,16 @@ export class ProjectsService {
         });
       }
 
+      // The creator is enrolled as the project's first admin. Without this,
+      // a session user who just created a project would fail
+      // ProjectScopeGuard on every subsequent request to it — no
+      // ProjectMember row would exist, and nothing else creates one.
+      if (actor.type === 'user' && actor.id) {
+        await tx.projectMember.create({
+          data: { userId: actor.id, projectId, role: 'admin' },
+        });
+      }
+
       return tx.project.findUniqueOrThrow({
         where: { id: projectId },
         include: { repositories: true, targets: true, scopePolicies: true },
