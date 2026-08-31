@@ -69,6 +69,8 @@ That last check matters as much as the happy path — it proves the safety prope
 - Worker base images, egress policy, non-root hardening
 - Vulnerable fixture app
 
+The application slice is implemented. Live container acceptance remains open until the local Docker Linux engine is available; static security checks and API tests do not substitute for the Compose exit criterion.
+
 **Exit:** a job runs in a sandboxed worker and writes evidence to object storage.
 
 ### M2 — Deterministic spine (weeks 4–6)
@@ -165,7 +167,7 @@ Request-ID instrumented correlation mode · Express and Django route parsing · 
 | Item | Owner | Blocks |
 |---|---|---|
 | **Semgrep ruleset licensing review** | Legal | M2 — swapping SAST engines later is expensive ([02 §3](../02-stack/README.md#3-open-item-semgrep-licensing)) |
-| Secrets management implementation choice | Eng | M1 |
+| ~~Secrets management implementation choice~~ | Eng | Closed — portable provider interface; local KEK for development, cloud KMS binding deferred |
 | ~~Naming: directory `Kase` vs. product name in PRD~~ — **closed.** Product is Kase throughout; CLI namespace is `kase` | Product | — |
 | LLM provider contract and rate limits | Eng | M4 |
 | Evidence retention policy vs. customer requirements | Product | M2 |

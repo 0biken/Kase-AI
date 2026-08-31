@@ -313,6 +313,7 @@ export class ProjectsService {
     actor: Actor,
   ): Promise<unknown> {
     await this.assertProjectExists(projectId);
+    if (dto.credentialId) await this.assertCredentialUsable(projectId, dto.credentialId);
     const created = await this.prisma.repository.create({
       data: { id: newId('repository'), projectId, ...dto },
     });
@@ -341,6 +342,7 @@ export class ProjectsService {
     if (!before) {
       throw new ProblemException('NOT_FOUND', `No repository "${repositoryId}" in this project`);
     }
+    if (dto.credentialId) await this.assertCredentialUsable(projectId, dto.credentialId);
     const after = await this.prisma.repository.update({
       where: { id: repositoryId },
       data: { ...dto },
@@ -387,6 +389,7 @@ export class ProjectsService {
 
   async createTarget(projectId: string, dto: TargetInputDto, actor: Actor): Promise<unknown> {
     await this.assertProjectExists(projectId);
+    if (dto.authCredentialId) await this.assertCredentialUsable(projectId, dto.authCredentialId);
     const created = await this.prisma.target.create({
       data: {
         id: newId('target'),
@@ -431,6 +434,7 @@ export class ProjectsService {
     if (!before) {
       throw new ProblemException('NOT_FOUND', `No target "${targetId}" in this project`);
     }
+    if (dto.authCredentialId) await this.assertCredentialUsable(projectId, dto.authCredentialId);
 
     const touchesProduction =
       before.environment === 'production' || dto.environment === 'production';
@@ -498,6 +502,19 @@ export class ProjectsService {
       select: { id: true },
     });
     if (!exists) throw new ProblemException('NOT_FOUND', `No project with id "${projectId}"`);
+  }
+
+  private async assertCredentialUsable(projectId: string, secretId: string): Promise<void> {
+    const secret = await this.prisma.secret.findFirst({
+      where: { id: secretId, projectId, revokedAt: null },
+      select: { id: true },
+    });
+    if (!secret) {
+      throw new ProblemException(
+        'VALIDATION_FAILED',
+        'Credential must reference an active secret in the same project',
+      );
+    }
   }
 }
 

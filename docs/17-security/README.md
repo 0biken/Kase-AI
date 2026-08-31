@@ -105,9 +105,10 @@ The agent can request destructive capability via the tool contract; the request 
 
 Detailed in [02 §4](../02-stack/README.md#4-secrets-management-is-a-first-class-requirement). Summary of the invariants:
 
-- Envelope encryption; master key in cloud KMS; ciphertext in Postgres.
+- Envelope encryption; a fresh data key per immutable secret version, wrapped through a portable key-encryption provider; ciphertext in Postgres.
+- Local development uses `KASE_LOCAL_KEK`. Production binds the provider to a cloud KMS without changing the secret model.
 - Decrypted only in the worker that needs the value, at job start.
-- Never written to disk, never baked into images, never placed in a persisted job payload.
+- Never written to a persistent filesystem, baked into images, or placed in a persisted job payload. Tool files exist only in `/run/kase-secrets` tmpfs for the duration of a job.
 - Registered with the redactor before any tool runs.
 - Rotation and revocation are API operations.
 - Never in argv — process lists and CI logs capture argv.

@@ -39,6 +39,8 @@ const ID_PREFIX = {
   projectMember: 'pmem',
   auditTrailEvent: 'evt',
   invite: 'inv',
+  secret: 'sec',
+  secretVersion: 'sver',
 };
 
 /** Crockford base32, 26 chars — the ULID canonical form. */

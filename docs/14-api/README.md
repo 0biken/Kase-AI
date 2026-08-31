@@ -58,6 +58,17 @@ DELETE /api/v1/projects/:id/tokens/:tokenId
 
 All three are `admin`-only — even listing, since a token's name and `displayPrefix` already say who can act as what on the project. The plaintext is returned exactly once, in the `POST` response; every later read shows only `displayPrefix` (the leading characters, e.g. `kase_ab3f`) alongside `role`, `createdAt`, `lastUsedAt`, and `expiresAt`. `DELETE` revokes rather than deletes — the row (and its `displayPrefix`) has to keep resolving for anything that already cited it in the audit trail ([17 §9](../17-security/README.md)).
 
+### Managing secrets
+
+```http
+POST   /api/v1/projects/:id/secrets
+GET    /api/v1/projects/:id/secrets
+POST   /api/v1/projects/:id/secrets/:secretId/rotate
+DELETE /api/v1/projects/:id/secrets/:secretId
+```
+
+All secret routes are `admin`-only. Create and rotate accept a value, but responses contain metadata only; no read route can recover plaintext. Rotation creates an immutable version atomically. `DELETE` revokes the secret, preventing new worker leases while preserving its metadata and audit trail. Repository and target credential IDs must reference an active secret in the same project.
+
 ### Creating and listing projects
 
 `POST`/`GET /api/v1/projects` are organization-level: a project cannot be project-scoped before it exists, so `ProjectScopeGuard` treats them as a distinct case rather than resolving a project id. Only a session principal may call them — an API token is always scoped to one existing project (this section, above) and has no organization to act across. Any session user belonging to the organization may call either; v1 has no organization-level role beyond that, matching 17 §8 ("v1 is single-organization"). The user who creates a project is automatically enrolled as that project's first `admin`, in the same transaction as project creation — otherwise they would fail `ProjectScopeGuard` on their own project immediately afterward.
@@ -153,6 +164,8 @@ POST /api/v1/projects/prj_01H.../audits
   "budgetOverrides": { "maxWallMinutes": 45 }
 }
 ```
+
+The M1 implementation exposes a deliberately narrow vertical slice of this contract: `mode: "smoke"`, one `targetId`, and `category: "fixture_health"`. It creates one recon job and places only `auditId`, `auditJobId`, and `projectId` in Redis. The full request shape above is introduced by M2 orchestration.
 
 Response includes `buildProvenance`, so a caller sees immediately whether correlation will be gate-eligible:
 

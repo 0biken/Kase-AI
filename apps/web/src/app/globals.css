@@ -1,0 +1,274 @@
+:root {
+  --ink: #080b0d;
+  --canvas: #0c1013;
+  --surface: #12181c;
+  --surface-raised: #182025;
+  --line: #27343a;
+  --line-strong: #3b4b52;
+  --text: #f2f7f6;
+  --muted: #9bacb0;
+  --quiet: #718287;
+  --accent: #62d5bb;
+  --accent-ink: #06211d;
+  --critical: #f46a65;
+  --warning: #e6b56b;
+  --radius: 18px;
+  --radius-small: 12px;
+  --font-sans: "Aptos", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "SFMono-Regular", Consolas, monospace;
+
+  /* Entering/exiting elements. Strong ease-out: movement is visible
+     immediately, which is the moment the eye is actually watching. */
+  --ease: cubic-bezier(.16, 1, .3, 1);
+  /* Hover and colour changes, where ease-out overshoots the intent. */
+  --ease-hover: cubic-bezier(.4, 0, .2, 1);
+
+  /* Two tracking values, not seven. Display type needs negative tracking to
+     stop looking loose; body text does not. */
+  --track-tight: -0.02em;
+  --track-snug: -0.01em;
+}
+
+* { box-sizing: border-box; }
+html { background: var(--ink); color-scheme: dark; scroll-behavior: smooth; }
+body { margin: 0; background: var(--ink); color: var(--text); font-family: var(--font-sans); }
+a { color: inherit; text-decoration: none; }
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; touch-action: manipulation; }
+[id] { scroll-margin-top: 24px; }
+
+.skip-link { position: fixed; top: 10px; left: 10px; z-index: 1000; padding: 10px 14px; border-radius: 8px; color: var(--accent-ink); background: var(--accent); font-size: 14px; font-weight: 700; transform: translateY(calc(-100% - 20px)); transition: transform 160ms var(--ease); }
+.skip-link:focus-visible { transform: translateY(0); }
+
+/* Keyboard focus was entirely invisible on links and buttons — only form
+   fields had any focus treatment. :focus-visible keeps it off mouse clicks. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.site-shell { min-height: 100dvh; background: radial-gradient(900px 520px at 72% -20%, rgba(98, 213, 187, .13), transparent 63%), var(--ink); }
+.site-nav { max-width: 1280px; margin: 0 auto; padding: 22px 32px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.wordmark { display: inline-flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 720; letter-spacing: -.04em; }
+.mark { width: 30px; height: 30px; border: 1px solid rgba(98,213,187,.65); border-radius: 9px; display: grid; place-items: center; color: var(--accent); font-family: var(--font-mono); font-size: 14px; font-weight: 700; }
+.nav-links { display: flex; align-items: center; gap: 26px; color: var(--muted); font-size: 14px; }
+.nav-links a:hover { color: var(--text); }
+.nav-links .nav-cta { color: var(--accent-ink); background: var(--accent); padding: 10px 16px; border-radius: 999px; font-weight: 700; transition: transform 180ms var(--ease), background 180ms var(--ease); }
+.nav-links .nav-cta:hover { color: var(--accent-ink); background: #80e3cc; transform: translateY(-1px); }
+
+.hero { max-width: 1280px; margin: 0 auto; padding: 84px 32px 112px; display: grid; grid-template-columns: minmax(0, 1.04fr) minmax(360px, .96fr); gap: 64px; align-items: center; }
+.eyebrow { color: var(--accent); font-family: var(--font-mono); font-size: 11px; font-weight: 650; letter-spacing: .11em; text-transform: uppercase; }
+.hero h1 { max-width: 680px; margin: 16px 0 20px; font-size: clamp(3rem, 6.2vw, 5.9rem); line-height: .98; letter-spacing: -.065em; font-weight: 760; text-wrap: balance; }
+.hero-copy { max-width: 535px; color: var(--muted); font-size: 18px; line-height: 1.6; }
+.button-row { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 31px; }
+.button { min-height: 46px; display: inline-flex; align-items: center; justify-content: center; gap: 10px; padding: 0 18px; border: 1px solid var(--line-strong); border-radius: 999px; color: var(--text); background: transparent; font-weight: 600; font-size: 14px; transition: transform 140ms var(--ease), border-color 160ms var(--ease-hover), background 160ms var(--ease-hover); }
+/* Hover gated: on touch devices an ungated :hover fires on tap and sticks
+   until the next tap elsewhere. */
+@media (hover: hover) and (pointer: fine) {
+  .button:hover { border-color: #65777b; background: rgba(255,255,255,.03); }
+  .button-primary:hover { background: #80e3cc; border-color: #80e3cc; }
+  .button-primary:hover .button-arrow { transform: translateX(2px); }
+}
+/* Press feedback. The old rule only cancelled the hover lift, so the button
+   never actually acknowledged the press. */
+.button:active { transform: scale(0.97); }
+.button-primary { border-color: var(--accent); color: var(--accent-ink); background: var(--accent); }
+.button-arrow { width: 24px; height: 24px; border-radius: 50%; background: rgba(6,33,29,.15); display: grid; place-items: center; transition: transform 160ms var(--ease); }
+
+.bezel { padding: 1px; border-radius: calc(var(--radius) + 2px); background: linear-gradient(145deg, rgba(143,171,171,.28), rgba(143,171,171,.05)); box-shadow: 0 26px 80px rgba(0,0,0,.28); }
+.bezel-inner { border-radius: var(--radius); background: linear-gradient(145deg, rgba(25,33,37,.98), rgba(13,18,21,.98)); box-shadow: inset 0 1px rgba(255,255,255,.055); }
+.signal-panel { padding: 24px; min-height: 360px; }
+.signal-top, .card-head, .finding-meta, .status-line { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.signal-title { font-size: 13px; color: var(--muted); }
+.live-state { color: var(--accent); font: 600 11px var(--font-mono); letter-spacing: .07em; text-transform: uppercase; }
+.gate-word { margin: 54px 0 10px; color: var(--text); font-size: clamp(3.2rem, 6vw, 5.7rem); font-weight: 760; letter-spacing: -.075em; line-height: .9; }
+.gate-word span { color: var(--accent); }
+.signal-summary { color: var(--muted); max-width: 330px; line-height: 1.55; }
+.signal-rule { height: 1px; margin: 30px 0 18px; background: var(--line); }
+.signal-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; color: var(--muted); font-size: 13px; padding: 9px 0; }
+.signal-row strong { color: var(--text); font-family: var(--font-mono); font-size: 12px; }
+
+.section { max-width: 1280px; margin: 0 auto; padding: 96px 32px; }
+.section-header { max-width: 710px; margin-bottom: 38px; }
+.section h2 { margin: 12px 0 14px; letter-spacing: -.052em; line-height: 1; font-size: clamp(2.25rem, 4.1vw, 4.4rem); text-wrap: balance; }
+.section-intro { max-width: 610px; margin: 0; color: var(--muted); font-size: 17px; line-height: 1.6; }
+.feature-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 16px; }
+.feature-list { display: grid; gap: 1px; background: var(--line); border-radius: var(--radius); overflow: hidden; }
+.feature-row { background: var(--canvas); padding: 24px; display: grid; grid-template-columns: 34px 1fr; gap: 16px; transition: background 200ms var(--ease); }
+.feature-row:hover { background: #11181b; }
+.feature-index { color: var(--accent); font: 600 12px var(--font-mono); }
+.feature-row h3 { margin: 0 0 7px; letter-spacing: -.025em; font-size: 17px; }
+.feature-row p { margin: 0; color: var(--muted); line-height: 1.55; font-size: 14px; }
+.proof-card { min-height: 100%; padding: 28px; }
+.proof-card h3 { max-width: 400px; margin: 18px 0 24px; font-size: 27px; letter-spacing: -.045em; line-height: 1.08; }
+.proof-list { display: grid; gap: 12px; }
+.proof-item { display: flex; align-items: flex-start; gap: 11px; color: var(--muted); font-size: 14px; }
+.proof-item b { color: var(--accent); font-family: var(--font-mono); }
+
+.form-layout { display: grid; grid-template-columns: .86fr 1.14fr; gap: 48px; align-items: start; }
+.form-copy h2 { margin-top: 14px; }
+.form-copy p { color: var(--muted); line-height: 1.6; max-width: 430px; }
+.intake-form { padding: 24px; }
+.form-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 16px; }
+.field { display: grid; gap: 8px; }
+.field.full { grid-column: 1 / -1; }
+.field label { font-size: 12px; color: var(--text); font-weight: 650; }
+.field input, .field textarea, .field select { width: 100%; appearance: none; border: 1px solid var(--line-strong); border-radius: var(--radius-small); background: #0b0f12; padding: 12px 13px; color: var(--text); outline: none; }
+.field textarea { resize: vertical; min-height: 124px; }
+.field input:focus-visible, .field textarea:focus-visible, .field select:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(98,213,187,.14); }
+.field input::placeholder, .field textarea::placeholder { color: #68797e; }
+.form-note { min-height: 22px; margin: 14px 0 0; color: var(--muted); font-size: 13px; }
+.form-note.error { color: #ff9d98; }
+.form-note.success { color: var(--accent); }
+
+.faq-list { display: grid; gap: 10px; }
+.faq { border: 1px solid var(--line); border-radius: var(--radius-small); background: rgba(18,24,28,.45); }
+.faq summary { list-style: none; padding: 18px 20px; cursor: pointer; font-weight: 650; display: flex; justify-content: space-between; gap: 20px; }
+.faq summary::-webkit-details-marker { display: none; }
+.faq summary::after { content: "+"; color: var(--accent); font: 500 20px var(--font-mono); }
+.faq[open] summary::after { content: "-"; }
+.faq p { max-width: 700px; margin: 0; padding: 0 20px 20px; color: var(--muted); line-height: 1.6; }
+.footer { max-width: 1280px; margin: 0 auto; padding: 30px 32px 50px; display: flex; justify-content: space-between; gap: 24px; color: var(--quiet); font-size: 13px; }
+.footer-links { display: flex; flex-wrap: wrap; gap: 18px; }
+.footer a:hover { color: var(--accent); }
+
+/* ============================================================ dashboard
+   A tool surface, not a landing page. One elevation level, hairline
+   borders, no drop shadows: if every card floats, none of them reads as
+   important. Type tops out at 20px — display sizes belong on marketing. */
+
+.dash { min-height: 100dvh; display: grid; grid-template-columns: 236px minmax(0,1fr); background: var(--ink); }
+
+/* ---- sidebar */
+.dash-side { position: sticky; top: 0; height: 100dvh; padding: 20px 12px; border-right: 1px solid var(--line); background: #0a0e10; display: flex; flex-direction: column; }
+.dash-brand { display: inline-flex; align-items: center; gap: 9px; padding: 0 10px; margin-bottom: 32px; font-size: 15px; font-weight: 600; letter-spacing: var(--track-tight); }
+.dash-brand-mark { width: 24px; height: 24px; border: 1px solid rgba(98,213,187,.5); border-radius: 7px; display: grid; place-items: center; color: var(--accent); font-family: var(--font-mono); font-size: 12px; font-weight: 600; }
+.dash-nav { display: grid; gap: 1px; }
+.dash-nav-item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border-radius: 7px; color: var(--muted); font-size: 13.5px; transition: color 160ms var(--ease-hover), background 160ms var(--ease-hover); }
+@media (hover: hover) and (pointer: fine) {
+  .dash-nav-item:not(.is-disabled):hover { color: var(--text); background: rgba(255,255,255,.035); }
+}
+/* Active state marked with a rail, not a fill — quieter, and it survives
+   sitting next to a hover without the two states competing. */
+.dash-nav-item[aria-current='page'] { color: var(--text); background: rgba(255,255,255,.045); box-shadow: inset 2px 0 0 var(--accent); }
+/* Unavailable items must LOOK unavailable. Previously identical to links. */
+.dash-nav-item.is-disabled { color: #56666b; cursor: default; }
+.dash-nav-soon { font: 500 10px var(--font-mono); letter-spacing: .04em; text-transform: uppercase; color: #46565b; border: 1px solid #232e33; border-radius: 4px; padding: 1px 5px; }
+.dash-side-note { margin: auto 0 0; padding: 14px 10px 0; border-top: 1px solid var(--line); color: var(--quiet); font-size: 11.5px; line-height: 1.5; }
+
+/* ---- main */
+.dash-main { padding: 24px clamp(20px,3.5vw,48px) 56px; }
+.dash-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; padding-bottom: 24px; margin-bottom: 24px; border-bottom: 1px solid var(--line); }
+.dash-eyebrow { margin: 0 0 4px; color: var(--quiet); font-size: 12px; }
+.dash-title { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: var(--track-tight); }
+.dash-account { text-align: right; display: grid; gap: 2px; }
+.dash-account-email { color: var(--text); font-size: 13px; }
+.dash-account-meta { color: var(--quiet); font-size: 12px; }
+
+/* Capped rather than edge-to-edge. At 1400px+ a full-bleed stack of three
+   cards reads as sparse; a measured column reads as composed. */
+.dash-stack { display: grid; gap: 14px; max-width: 1080px; }
+.dash-split { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 14px; }
+
+/* ---- cards: flat, hairline, no shadow */
+.card { border: 1px solid var(--line); border-radius: var(--radius); background: var(--surface); }
+.card-body { padding: 20px; }
+.card-setup .card-body { padding: 26px; }
+.card-eyebrow { margin: 0 0 8px; color: var(--accent); font-size: 12px; font-weight: 500; }
+/* text-wrap: balance evens the line lengths and kills the orphaned final
+   word ("…run your first / audit.") that a hard max-width produced. */
+.card-title { margin: 0 0 10px; max-width: 34ch; font-size: 19px; font-weight: 600; letter-spacing: var(--track-tight); line-height: 1.25; text-wrap: balance; }
+.card-text { margin: 0; max-width: 62ch; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+.card-heading { margin: 0 0 14px; font-size: 14px; font-weight: 600; letter-spacing: var(--track-snug); }
+.card-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; }
+
+/* ---- hero: copy beside the correlation visual.
+   The visual is the point of the card, so it gets the larger share once
+   there is room for both; below 1080px it drops under the copy rather than
+   compressing into an unreadable strip. */
+/* The visual takes the larger share: it is the focal point, and its 620px
+   viewBox compresses the mono labels if given much less. */
+.hero-grid { display: grid; grid-template-columns: minmax(0,0.82fr) minmax(0,1.18fr); gap: 32px; align-items: center; }
+.hero-copy { min-width: 0; }
+.hero-visual { min-width: 0; display: flex; justify-content: center; }
+@media (max-width: 1080px) {
+  .hero-grid { grid-template-columns: 1fr; gap: 22px; }
+  .hero-visual { justify-content: flex-start; }
+}
+
+/* ---- readiness */
+.ready-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.ready-item { display: grid; grid-template-columns: auto minmax(0,1fr) auto; align-items: center; gap: 10px; padding: 11px 0; border-top: 1px solid var(--line); }
+.ready-item:first-child { border-top: 0; padding-top: 0; }
+.ready-dot { width: 6px; height: 6px; border-radius: 50%; }
+.ready-dot-done { background: var(--accent); }
+.ready-dot-next { background: #3b4b52; }
+.ready-text { display: grid; gap: 2px; min-width: 0; }
+.ready-label { color: var(--text); font-size: 13px; }
+.ready-detail { color: var(--quiet); font-size: 12px; }
+.ready-state { font: 500 11px var(--font-mono); letter-spacing: .03em; white-space: nowrap; }
+.ready-state-done { color: var(--accent); }
+.ready-state-next { color: var(--quiet); }
+
+/* ---- doc links */
+.doc-list { display: grid; gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: var(--radius-small); overflow: hidden; }
+.doc-item { display: grid; gap: 3px; padding: 12px 14px; background: var(--surface); transition: background 160ms var(--ease-hover); }
+@media (hover: hover) and (pointer: fine) {
+  .doc-item:hover { background: var(--surface-raised); }
+}
+.doc-item:active { background: #10161a; }
+.doc-title { color: var(--text); font-size: 13px; font-weight: 500; }
+.doc-detail { color: var(--quiet); font-size: 12px; line-height: 1.45; }
+
+/* ---- entry stagger. Decorative only; never gates interaction. */
+.dash-stack > * { opacity: 0; transform: translateY(6px); animation: dash-in 320ms var(--ease) forwards; }
+.dash-stack > *:nth-child(1) { animation-delay: 0ms; }
+.dash-stack > *:nth-child(2) { animation-delay: 40ms; }
+@keyframes dash-in { to { opacity: 1; transform: translateY(0); } }
+
+.docs-page { max-width: 1080px; margin: 0 auto; padding: 74px 32px; }
+.docs-page h1 { margin: 12px 0; font-size: clamp(2.8rem,6vw,5rem); letter-spacing: -.065em; line-height: .95; text-wrap: balance; }
+.docs-page > p { max-width: 670px; color: var(--muted); font-size: 17px; line-height: 1.6; }
+.docs-directory { margin-top: 52px; display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 12px; }
+.docs-directory a { padding: 22px; border: 1px solid var(--line); border-radius: var(--radius); background: rgba(18,24,28,.5); transition: transform 180ms var(--ease), border-color 180ms var(--ease); }
+.docs-directory a:hover { transform: translateY(-3px); border-color: rgba(98,213,187,.7); }
+.docs-directory strong { display: block; font-size: 18px; letter-spacing: -.025em; }
+.docs-directory span { display: block; margin-top: 8px; color: var(--muted); line-height: 1.5; font-size: 14px; }
+
+@media (max-width: 900px) {
+  .hero, .feature-grid, .form-layout, .dash-split { grid-template-columns: 1fr; }
+  .hero { padding-top: 62px; gap: 36px; }
+  .dash { display: block; }
+  .dash-side { position: static; height: auto; padding: 14px 12px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .dash-brand { margin-bottom: 14px; }
+  /* Horizontal rail on narrow screens. The rail-style active marker moves to
+     the bottom edge so it still reads as "current" when laid out in a row. */
+  .dash-nav { grid-auto-flow: column; grid-auto-columns: max-content; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+  .dash-nav::-webkit-scrollbar { display: none; }
+  .dash-nav-item { white-space: nowrap; }
+  .dash-nav-item[aria-current='page'] { box-shadow: inset 0 -2px 0 var(--accent); }
+  .dash-side-note { display: none; }
+}
+@media (max-width: 680px) {
+  .site-nav, .section, .footer, .docs-page { padding-left: 20px; padding-right: 20px; }
+  .site-nav { padding-top: 16px; }
+  .nav-links a:not(.nav-cta) { display: none; }
+  .hero { padding-left: 20px; padding-right: 20px; padding-bottom: 80px; }
+  .hero h1 { font-size: clamp(3rem,14vw,4.6rem); }
+  .section { padding-top: 72px; padding-bottom: 72px; }
+  .form-grid, .docs-directory { grid-template-columns: 1fr; }
+  .dash-main { padding: 20px 20px 40px; }
+  .dash-header { align-items: flex-start; }
+  .dash-account { display: none; }
+  .card-setup .card-body { padding: 20px; }
+  .card-actions .button { width: 100%; }
+  .footer { flex-direction: column; }
+}
+
+/* Reduced motion means less movement, not no feedback. Opacity and colour
+   transitions survive; translation and the entry stagger do not. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; }
+  .dash-stack > * { animation: none; opacity: 1; transform: none; }
+}

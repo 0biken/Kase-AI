@@ -33,17 +33,22 @@ export default async function SignIn({
         : null;
 
   return (
-    <main style={{ fontFamily: 'system-ui, sans-serif', padding: '3rem', maxWidth: '28rem', lineHeight: 1.6 }}>
-      <h1>Sign in to Kase</h1>
+    <main className="site-shell">
+      <nav className="site-nav" aria-label="Primary navigation"><a className="wordmark" href="/"><span className="mark">K</span>kase</a></nav>
+      <section className="docs-page" style={{ maxWidth: '620px', paddingTop: '58px' }}>
+      <div className="eyebrow">Secure workspace</div>
+      <h1>Sign in to Kase.</h1>
+      <p>Access is provisioned by invitation. Your identity is verified before a workspace session is created.</p>
+      <div className="bezel" style={{ marginTop: '34px' }}><div className="bezel-inner intake-form">
 
       {message && (
-        <p role="alert" style={{ padding: '0.75rem 1rem', border: '1px solid #b00', borderRadius: 6 }}>
+        <p role="alert" className="form-note error" style={{ marginBottom: '18px' }}>
           {message}
         </p>
       )}
 
       {available.length === 0 ? (
-        <p role="alert">
+          <p role="alert" className="form-note error">
           No sign-in providers are configured. Set the <code>KASE_*_CLIENT_ID</code> and{' '}
           <code>KASE_*_CLIENT_SECRET</code> environment variables.
         </p>
@@ -56,17 +61,17 @@ export default async function SignIn({
               await signIn(s.id, { redirectTo: '/' });
             }}
           >
-            <button type="submit" style={{ display: 'block', width: '100%', padding: '0.75rem', marginBottom: '0.75rem' }}>
+            <button className="button button-primary" style={{ width: '100%', marginBottom: '10px' }} type="submit">
               {LABELS[s.id]}
             </button>
           </form>
         ))
       )}
 
-      <p style={{ fontSize: '0.875rem', color: '#555' }}>
-        Kase is invite-only. Signing in with a provider does not create an account on its own —
+      <p className="form-note">
+        Kase is invite-only. Signing in with a provider does not create an account on its own.
         an organization admin has to invite your address first.
       </p>
-    </main>
+      </div></div></section></main>
   );
 }

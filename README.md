@@ -81,6 +81,8 @@ One correlated finding, both evidence artifacts preserved, gate blocks the build
 
 [TASKS.md](TASKS.md) is the executable checklist — 130 tasks across Phase 0 and M1–M7, with milestone exit criteria as the real gates. Start with Phase 0; the Semgrep licensing review has the longest lead time and blocks M2.
 
+For substantial engineering work, [`quality-gates/`](quality-gates/README.md) provides executable completion ledgers backed by a project-local, commit-pinned copy of Unlazy. This verifies development claims only; it is deliberately separate from Kase's product policy engine and never runs in audit workers.
+
 ---
 
 ## Development Setup

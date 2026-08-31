@@ -4,6 +4,10 @@
   "private": true,
   "scripts": {
     "dev": "pnpm --filter @kase/api run start:dev",
-    "build": "pnpm -r run build"
+    "build": "pnpm -r run build",
+    "gates:init": "node scripts/init-gates.mjs",
+    "gates:lint": "node .agents/skills/unlazy/scripts/gate-lint.mjs",
+    "gates:status": "node .agents/skills/unlazy/scripts/gate-check.mjs --status",
+    "gates:reverify": "node .agents/skills/unlazy/scripts/gate-check.mjs --reverify"
   }
 }

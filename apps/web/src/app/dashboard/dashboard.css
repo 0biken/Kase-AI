@@ -1,0 +1,376 @@
+/* ============================================================================
+   Kase dashboard — atmosphere + glow layer
+   ----------------------------------------------------------------------------
+   Loads AFTER globals.css and only overrides. globals.css deliberately built
+   the dashboard flat (hairline borders, one elevation, no shadows) so nothing
+   competed for attention. That reads honest but inert. This layer adds depth
+   WITHOUT reintroducing the thing flatness was protecting against: every
+   surface floating equally. Depth here is a hierarchy — atmosphere sits
+   furthest back, secondary cards sit quietly on it, and exactly one surface
+   (.card-setup) is allowed to glow.
+
+   Two constraints govern every value below:
+     1. Dense body text sits on these surfaces. Contrast beats prettiness.
+        Background gradients stay under .08 alpha, always.
+     2. Depth comes from light, not levitation. No hover translateY anywhere —
+        that was removed from the house style on purpose.
+   ========================================================================== */
+
+
+/* ---------------------------------------------------------------- atmosphere
+
+   The flat --ink fill becomes a layered mesh. Both layers live on pseudo-
+   elements rather than on .dash's own `background` for two reasons: a gradient
+   painted on .dash would scroll and stretch against a 100dvh grid.
+
+   position: fixed locks the mesh to the viewport, so scrolling a long card
+   stack reads as moving THROUGH light rather than dragging it along. Fixed
+   also removes the pseudos from grid flow — a static ::before would otherwise
+   be placed as a grid item into the 236px sidebar column and shove the whole
+   layout sideways.
+
+   isolation: isolate scopes the z-index:-1 layers to .dash so they paint above
+   .dash's own background but below all of its content. Without it they sink
+   behind the <body> fill and vanish. */
+.dash {
+  position: relative;
+  isolation: isolate;
+  background: var(--ink);
+}
+
+/* Base layer: cool falloff. Establishes that the dark is a lit room rather than
+   a void, and it does most of the work — so the accent bloom stacked on top can
+   stay very faint. Alphas ≤ .055: at this size a gradient reads long before it
+   reads bright, and text crosses all of it. */
+.dash::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(1200px 780px at 84% -12%, rgba(98, 213, 187, .055), transparent 62%),
+    radial-gradient(900px 640px at 6% 4%, rgba(96, 140, 168, .05), transparent 58%),
+    radial-gradient(1000px 900px at 46% 118%, rgba(58, 96, 116, .045), transparent 64%);
+}
+
+/* Bloom layer: a single static accent mass. It adds atmosphere without an
+   indefinite animation competing with operational content. */
+.dash::after {
+  content: '';
+  position: fixed;
+  inset: -25%;
+  z-index: -1;
+  pointer-events: none;
+  background: radial-gradient(46% 40% at 78% 16%, rgba(98, 213, 187, .07), transparent 68%);
+}
+
+
+/* ------------------------------------------------------------------ sidebar
+
+   The rail goes translucent so the mesh continues underneath it instead of
+   stopping at a hard seam. Its border becomes a light hairline rather than a
+   solid --line: on glass, a solid grey border reads as a drawn box, while a
+   white-alpha line reads as an edge catching light.
+
+   Opaque fallback first; the @supports block further down upgrades it. */
+.dash-side {
+  background: #0a0e10;
+  border-right-color: rgba(255, 255, 255, .07);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, .025);
+}
+
+.dash-brand-mark {
+  /* The one place in the chrome where the accent reads as a light source
+     rather than a colour. Spread stays tight so it doesn't bleed into the
+     wordmark sitting 9px away. */
+  border-color: rgba(98, 213, 187, .55);
+  background: radial-gradient(120% 120% at 50% 0%, rgba(98, 213, 187, .16), rgba(98, 213, 187, .04));
+  box-shadow:
+    0 0 14px -4px rgba(98, 213, 187, .5),
+    inset 0 1px 0 rgba(255, 255, 255, .1);
+}
+
+
+/* ---------------------------------------------------------------- nav items
+
+   Hover gets a real (if faint) glass fill plus an inner top highlight, so the
+   row reads as lifting into light instead of just changing colour. Gated behind
+   hover/pointer because an ungated :hover sticks after a tap on touch. */
+@media (hover: hover) and (pointer: fine) {
+  .dash-nav-item:not(.is-disabled):hover {
+    background: rgba(255, 255, 255, .05);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+  }
+}
+
+/* Active state keeps globals' rail rather than switching to a fill — but the
+   rail now emits. The 90deg gradient is a bloom cast off the rail into the row,
+   and that is what sells it as a light source; a flat fill would only look like
+   a selected row. The gradient tops out at .085 and is gone by 44%, so the
+   label keeps full contrast across the span where the text actually sits. */
+.dash-nav-item[aria-current='page'] {
+  background:
+    linear-gradient(90deg, rgba(98, 213, 187, .085), rgba(98, 213, 187, 0) 44%),
+    rgba(255, 255, 255, .04);
+  box-shadow:
+    inset 2px 0 0 var(--accent),
+    inset 0 1px 0 rgba(255, 255, 255, .05),
+    -1px 0 12px -4px rgba(98, 213, 187, .45);
+  transition: background 180ms var(--ease-hover), box-shadow 180ms var(--ease-hover);
+}
+
+/* Unavailable rows must stay visibly inert — no glass, no highlight. Depth is a
+   signal in this layer, so withholding it from disabled items is part of the
+   signal rather than an oversight. */
+.dash-nav-item.is-disabled {
+  background: none;
+  box-shadow: none;
+}
+
+
+/* ------------------------------------------------------------------- header
+
+   The solid 1px rule becomes a hairline that fades out to the right. A rule at
+   constant weight edge-to-edge boxes the header in; one that dissolves lets the
+   header sit in the atmosphere instead of on top of it. */
+.dash-header {
+  border-bottom-color: transparent;
+  background-image: linear-gradient(90deg,
+    rgba(255, 255, 255, .11),
+    rgba(255, 255, 255, .05) 46%,
+    rgba(255, 255, 255, 0) 92%);
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% 1px;
+}
+
+
+/* -------------------------------------------------------- cards: glass base
+
+   Fallback path (no backdrop-filter): a near-opaque solid. Without blur behind
+   it, a translucent card just lets the mesh muddy the text — so browsers that
+   cannot blur get contrast instead of atmosphere. That is the correct trade.
+
+   The inner top highlight is the single detail that makes a dark panel read as
+   a physical surface: 1px where the top edge catches the light. */
+.card {
+  background: #12181c;
+  border-color: rgba(255, 255, 255, .08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .06),
+    0 12px 32px -18px rgba(0, 0, 0, .8);
+}
+
+/* .card-setup is the hero and the ONLY surface carrying an accent bloom. If the
+   secondary cards glowed too, nothing would be primary — the hierarchy is the
+   entire reason for adding elevation back.
+     - the wash (.05 max) implies light falling in from the top edge
+     - the -34px offset on the accent shadow keeps the halo hugging the card
+       instead of smearing across the page behind it
+     - the accent-tinted hairline ring ties the border into that halo */
+.card-setup {
+  background:
+    linear-gradient(180deg, rgba(98, 213, 187, .05), rgba(98, 213, 187, 0) 42%),
+    #141b1f;
+  border-color: rgba(98, 213, 187, .16);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .08),
+    0 0 0 1px rgba(98, 213, 187, .05),
+    0 24px 56px -28px rgba(0, 0, 0, .9),
+    0 0 70px -34px rgba(98, 213, 187, .55);
+}
+
+/* Upgrade path. The `or` covers Safari, which shipped the prefixed property
+   years before the unprefixed one — testing the unprefixed name alone would
+   drop every Safari user onto the opaque fallback.
+   Blur radii stay ≤ 18px: backdrop-filter cost scales with radius, and it is
+   the single most expensive thing on this page in Safari. */
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .dash-side {
+    background: rgba(10, 14, 16, .72);
+    -webkit-backdrop-filter: blur(14px) saturate(125%);
+    backdrop-filter: blur(14px) saturate(125%);
+  }
+
+  /* .68 is the alpha floor found by eye: enough mesh reads through to feel
+     layered, still dark enough that 13.5px --muted body copy holds contrast. */
+  .card {
+    background: rgba(18, 24, 28, .68);
+    -webkit-backdrop-filter: blur(14px) saturate(130%);
+    backdrop-filter: blur(14px) saturate(130%);
+  }
+
+  /* The hero is more transparent AND more blurred than its siblings — more
+     atmosphere resolves through it, which is what makes it read as the surface
+     closest to the viewer. */
+  .card-setup {
+    background:
+      linear-gradient(180deg, rgba(98, 213, 187, .06), rgba(98, 213, 187, 0) 44%),
+      rgba(20, 27, 31, .62);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    backdrop-filter: blur(18px) saturate(140%);
+  }
+}
+
+
+/* ---------------------------------------------------------------- card type
+
+   Colours are restated only to pin them against the new surfaces. Deliberately
+   no text-shadow glow on .card-eyebrow, .card-title, or any label: a halo on
+   12–19px type smears the stem edges and costs more legibility than the
+   atmosphere buys back. Glow in this system belongs to non-text elements. */
+.card-title { color: var(--text); }
+.card-eyebrow { color: var(--accent); }
+
+
+/* ---------------------------------------------------------------- readiness
+
+   Solid --line separators become white-alpha hairlines, which is what a divider
+   on a translucent surface has to be — a grey line over glass reads as painted
+   onto it rather than as part of it. */
+.ready-item { border-top-color: rgba(255, 255, 255, .07); }
+
+/* The done dot is a light source, not a coloured circle. At 6px the radial core
+   is what makes it read as emitting: a hot centre falling off to the accent at
+   the rim, then two rings for the halo. Two rings (tight + wide) rather than
+   one, because a single large blur reads as a smudge at this size. */
+.ready-dot-done {
+  background: radial-gradient(circle at 50% 45%, #b6f2e3, var(--accent) 72%);
+  box-shadow:
+    0 0 6px rgba(98, 213, 187, .75),
+    0 0 16px rgba(98, 213, 187, .3);
+}
+
+/* The not-started dot gets the inverse treatment — recessed, with a faint inner
+   ring so it reads as an empty socket waiting to be lit. The difference between
+   the two states is now luminance, not only hue. */
+.ready-dot-next {
+  background: rgba(255, 255, 255, .1);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14);
+}
+
+
+/* ---------------------------------------------------------------- doc links
+
+   globals built this list as a 1px grid gap showing a --line-coloured parent
+   through the cracks. That technique cannot survive translucency: each row sits
+   directly on the parent fill, so any transparency in a row gets tinted by the
+   light --line grey. Rebuilt with real borders — identical hairline result, and
+   now the card's glass shows through the rows instead of a flat slab. */
+.doc-list {
+  gap: 0;
+  background: transparent;
+  border-color: rgba(255, 255, 255, .075);
+}
+.doc-item {
+  background: transparent;
+  transition: background 180ms var(--ease-hover), box-shadow 180ms var(--ease-hover);
+}
+.doc-item + .doc-item { border-top: 1px solid rgba(255, 255, 255, .06); }
+
+@media (hover: hover) and (pointer: fine) {
+  /* Hover borrows the active-nav language: a light rail plus an inward bloom.
+     One idiom for "this is the live one" across nav and lists is cheaper to
+     learn than two unrelated hover treatments. */
+  .doc-item:hover {
+    background: rgba(255, 255, 255, .045);
+    box-shadow:
+      inset 2px 0 0 rgba(98, 213, 187, .6),
+      inset 0 0 28px -8px rgba(98, 213, 187, .18);
+  }
+}
+/* Press reads as the surface being pushed below the glass — darker, no bloom. */
+.doc-item:active {
+  background: rgba(0, 0, 0, .28);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, .4);
+}
+
+
+/* -------------------------------------------------------------- primary CTA
+
+   Scoped under .dash so the marketing pages' .button-primary is untouched.
+   The CTA is the brightest object on the screen and the only one emitting at
+   full strength — it should be findable with peripheral vision alone.
+   The transition list is respelled in full because globals' rule omits
+   box-shadow, and the halo has to move with the fill or the hover arrives in
+   two visibly separate stages. */
+.dash .button-primary {
+  box-shadow:
+    0 0 0 1px rgba(98, 213, 187, .3),
+    0 6px 20px -8px rgba(98, 213, 187, .5),
+    0 0 34px -12px rgba(98, 213, 187, .55);
+  transition:
+    transform 140ms var(--ease),
+    background 180ms var(--ease-hover),
+    box-shadow 180ms var(--ease-hover);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  /* Hover intensifies the halo — the light gets brighter, the button does not
+     move. That substitution is the whole house-style answer to a hover lift. */
+  .dash .button-primary:hover {
+    box-shadow:
+      0 0 0 1px rgba(98, 213, 187, .45),
+      0 8px 26px -8px rgba(98, 213, 187, .6),
+      0 0 46px -12px rgba(98, 213, 187, .7);
+  }
+  /* The secondary button stays glassy and quiet — it must never compete with
+     the primary for the same glance. */
+  .dash .button:not(.button-primary):hover {
+    background: rgba(255, 255, 255, .05);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06);
+  }
+}
+/* Pressing damps the glow, matching the existing scale(.97): light retreating
+   as the surface goes down. */
+.dash .button-primary:active {
+  box-shadow:
+    0 0 0 1px rgba(98, 213, 187, .3),
+    0 2px 10px -6px rgba(98, 213, 187, .45);
+}
+
+
+/* ------------------------------------------------------------- accessibility
+
+   Reduced motion removes the drift and freezes the mesh where it is. The glow
+   is static light rather than animation, so all of it survives — stripping it
+   here would take the hierarchy away from people who asked for less movement,
+   not less design. */
+@media (prefers-reduced-motion: reduce) {
+  .dash::after {
+    animation: none;
+    transform: none;
+  }
+}
+
+/* Reduced transparency gets the opaque fallback surfaces back at full strength.
+   Same reasoning as the no-backdrop-filter path: without blur, translucency is
+   only a contrast tax. */
+@media (prefers-reduced-transparency: reduce) {
+  .dash-side { background: #0a0e10; }
+  .card { background: #12181c; }
+  .card-setup {
+    background:
+      linear-gradient(180deg, rgba(98, 213, 187, .05), rgba(98, 213, 187, 0) 42%),
+      #141b1f;
+  }
+  .dash-side, .card, .card-setup {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* Mobile pays the most for backdrop-filter (no discrete GPU, and the sidebar
+   becomes a full-width bar that repaints on every scroll). Halving the radii
+   keeps the effect legible at a fraction of the cost. */
+@media (max-width: 680px) {
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .dash-side,
+    .card,
+    .card-setup {
+      -webkit-backdrop-filter: blur(9px) saturate(125%);
+      backdrop-filter: blur(9px) saturate(125%);
+    }
+  }
+}

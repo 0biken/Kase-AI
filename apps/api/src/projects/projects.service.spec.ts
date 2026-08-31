@@ -55,14 +55,16 @@ describe('ProjectsService', () => {
   let prisma: {
     project: { findUnique: jest.Mock };
     scopePolicy: { findFirst: jest.Mock };
-    target: { findFirst: jest.Mock; update: jest.Mock };
+    target: { findFirst: jest.Mock; update: jest.Mock; create: jest.Mock };
+    secret: { findFirst: jest.Mock };
   };
 
   beforeEach(async () => {
     prisma = {
       project: { findUnique: jest.fn() },
       scopePolicy: { findFirst: jest.fn() },
-      target: { findFirst: jest.fn(), update: jest.fn() },
+      target: { findFirst: jest.fn(), update: jest.fn(), create: jest.fn() },
+      secret: { findFirst: jest.fn() },
     };
 
     const mod = await Test.createTestingModule({
@@ -198,6 +200,49 @@ describe('ProjectsService', () => {
       await expect(
         service.updateTarget('prj_1', 'tgt_other', { name: 'x' }, actor),
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+  });
+
+  describe('credential references', () => {
+    it('rejects a revoked or cross-project secret before writing a target', async () => {
+      prisma.project.findUnique.mockResolvedValue({ id: 'prj_1' });
+      prisma.secret.findFirst.mockResolvedValue(null);
+
+      await expect(
+        service.createTarget(
+          'prj_1',
+          {
+            name: 'fixture',
+            baseUrl: 'http://fixture:3000',
+            environment: 'staging',
+            authCredentialId: 'sec_other',
+          } as never,
+          actor,
+        ),
+      ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+      expect(prisma.secret.findFirst).toHaveBeenCalledWith({
+        where: { id: 'sec_other', projectId: 'prj_1', revokedAt: null },
+        select: { id: true },
+      });
+    });
+
+    it('accepts an active same-project secret', async () => {
+      prisma.project.findUnique.mockResolvedValue({ id: 'prj_1' });
+      prisma.secret.findFirst.mockResolvedValue({ id: 'sec_1' });
+      prisma.target.create.mockResolvedValue({ id: 'tgt_1' });
+
+      await service.createTarget(
+        'prj_1',
+        {
+          name: 'fixture',
+          baseUrl: 'http://fixture:3000',
+          environment: 'staging',
+          authCredentialId: 'sec_1',
+        } as never,
+        actor,
+      );
+
+      expect(prisma.target.create).toHaveBeenCalled();
     });
   });
 });

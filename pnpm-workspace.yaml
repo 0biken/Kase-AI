@@ -8,8 +8,18 @@ packages:
 
 # Packages whose install scripts are required. Prisma cannot generate a client
 # without its postinstall; unrs-resolver ships a native binding used by eslint.
+#
+# Do NOT replace this with an `allowBuilds:` block containing "set this to true
+# or false" placeholders. pnpm writes that stub when it prompts interactively
+# and gets no answer; the values are not booleans, so Prisma's postinstall
+# never runs and node_modules/.prisma/client is silently never generated —
+# which fails as confusing "Property 'apiToken' does not exist" type errors far
+# from the actual cause. This has regressed once already.
 onlyBuiltDependencies:
   - '@prisma/client'
   - '@prisma/engines'
   - prisma
   - unrs-resolver
+  - '@nestjs/core'
+  - esbuild
+  - msgpackr-extract

@@ -90,11 +90,13 @@ Kase holds, at minimum:
 
 Requirements:
 
-- Envelope encryption: data key per secret, master key in cloud KMS. Ciphertext in Postgres.
-- Decryption happens in the worker at job start, never in the API process, and never written to disk.
+- Envelope encryption: a fresh data key per secret version, encrypted through a `KeyEncryptionProvider`; ciphertext and wrapped data keys live in Postgres.
+- The local provider wraps data keys with AES-256-GCM using the ignored `KASE_LOCAL_KEK` development key. Production cloud KMS bindings implement the same interface and remain a deployment choice, not an application rewrite.
+- Decryption happens in the worker at job start, never in the API process. If a tool requires a file, it is materialized only in the worker's `/run/kase-secrets` tmpfs and removed when the job ends.
 - Secrets are injected into workers via environment or tmpfs, never baked into images or job payloads persisted in Redis.
 - All secret values are registered with the log redactor before any tool runs — see [08 — Evidence §5](../08-evidence/README.md#5-redaction).
 - Rotation and revocation are API operations, not database surgery.
+- Rotation inserts an immutable `SecretVersion`; revocation prevents new leases but preserves metadata and audit history.
 
 Retrofitting this is painful. It is in the v1 P0 set.
 

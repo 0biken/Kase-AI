@@ -7,6 +7,10 @@ __pycache__/
 *.pyc
 *.pyo
 .pytest_cache/
+.pnpm-store/
+.playwright-cli/
+.unlazy/
+.unlazy-hook-state.json
 
 # Machine-local Claude Code settings (permissions etc.) — not shared
 .claude/settings.local.json

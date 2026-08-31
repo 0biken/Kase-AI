@@ -4,11 +4,11 @@ Executable form of [19 — Roadmap](docs/19-roadmap/README.md). Ordered by depen
 
 **Legend:** `[x]` done · `[~]` partially done · `[ ]` not started · **⚠** blocks other work
 
-**130 tasks, 13 done.** Counts include milestone exit criteria, which are the real gates.
+**130 tasks, 15 done.** Counts include milestone exit criteria, which are the real gates.
 
 | | Phase 0 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | Invariants |
 |---|---|---|---|---|---|---|---|---|---|
-| Done | 4 | 9 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Done | 5 | 10 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Total | 15 | 16 | 18 | 9 | 15 | 14 | 16 | 19 | 8 |
 
 ---
@@ -27,7 +27,7 @@ Non-code work that blocks code. Start the legal item this week; it has the longe
   - [ ] PII position: what may be captured, what must be redacted at capture
   - [ ] Customer-configurable override, and whether deletion is hard or soft
 - [ ] **LLM provider contract and rate limits** — blocks M4 budget design
-- [ ] **Secrets management** — recommend KMS envelope encryption per [02 §4](docs/02-stack/README.md#4-secrets-management-is-a-first-class-requirement); confirm or override
+- [x] **Secrets management** — portable `KeyEncryptionProvider`, local development KEK, production cloud KMS seam; envelope encryption confirmed
 - [x] **Correlation spike** — [`spike/correlation/`](spike/correlation/README.md), 11/11 passing
 - [x] **Technical documentation and PRD reconciliation** — `docs/` is source of truth
 - [x] **Extend spike to FastAPI** — decorator routing suggests parity, but that is a hypothesis, not a result. Do this before committing M5's estimate.
@@ -50,18 +50,18 @@ Non-code work that blocks code. Start the legal item this week; it has the longe
 - [x] CRUD for Project, Repository, Target, ScopePolicy — ULIDs, RFC 9457 errors, cursor pagination, audit trail with diffs; 112 tests
 - [x] Auth.js in Next, JWT verification in NestJS, `ProjectScopeGuard` — `apps/web` with GitHub/Google/Apple, invite-only provisioning, RS256 Next→Nest exchange; Nest side: single `AuthGuard`, deny-by-default `ProjectScopeGuard`, flat-role `RolesGuard`; 88 tests across both apps
 - [x] Project API tokens for CLI/CI, hashed at rest — SHA-256, `POST/GET/DELETE /projects/:id/tokens`, plaintext returned once, revoked not deleted
-- [ ] Secret storage with envelope encryption; rotation and revocation as API operations
+- [x] Secret storage with envelope encryption; rotation and revocation as API operations — metadata-only admin API, immutable versions, 32-byte local KEK provider
 
 ### Worker isolation
-- [ ] `worker-base` image: non-root, seccomp profile, pinned versions
-- [ ] Per-family images (`recon`, `browser`, `sast`, `deps`, `agent`)
-- [ ] Egress policy per image — agent worker gets **no** target egress
-- [ ] Secret injection via env/tmpfs, never baked into images or Redis payloads
+- [~] `worker-base` image: non-root, seccomp profile, pinned versions — implemented; live image inspection blocked until Docker's Linux engine is available
+- [~] Per-family images (`recon`, `browser`, `sast`, `deps`, `agent`) — stages implemented; live builds pending
+- [~] Egress policy per image — recon-only proxy network implemented; agent has **no** target or proxy network; live denial test pending
+- [~] Secret injection via env/tmpfs, never baked into images or Redis payloads — implemented and unit-tested; live tmpfs inspection pending
 - [x] Promote the spike fixture into `fixtures/vulnerable-app/` with Compose wiring
 
 **Exit criteria**
-- [ ] A job dispatched via the API runs in a sandboxed worker and persists hashed evidence to object storage
-- [ ] A worker denied egress to a non-allowlisted host fails closed and logs the denial
+- [~] A job dispatched via the API runs in a sandboxed worker and persists hashed evidence to object storage — application path implemented; Compose proof pending
+- [~] A worker denied egress to a non-allowlisted host fails closed and logs the denial — proxy and fail-closed path implemented; Compose proof pending
 
 ---
 

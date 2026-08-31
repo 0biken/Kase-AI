@@ -28,6 +28,8 @@ export declare const ID_PREFIX: {
   readonly projectMember: 'pmem';
   readonly auditTrailEvent: 'evt';
   readonly invite: 'inv';
+  readonly secret: 'sec';
+  readonly secretVersion: 'sver';
 };
 
 export type IdKind = keyof typeof ID_PREFIX;

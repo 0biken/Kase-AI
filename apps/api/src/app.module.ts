@@ -13,6 +13,7 @@ import { AuditTrailModule } from './audit-trail/audit-trail.module';
 import { AuthModule } from './auth/auth.module';
 import { ProjectsModule } from './projects/projects.module';
 import { TokensModule } from './tokens/tokens.module';
+import { SecretsModule } from './secrets/secrets.module';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { TokensModule } from './tokens/tokens.module';
     AssuranceModule,
     ProjectsModule,
     TokensModule,
+    SecretsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

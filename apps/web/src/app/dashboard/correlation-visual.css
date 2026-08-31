@@ -1,0 +1,283 @@
+/* ------------------------------------------------------------------
+   Correlation visual — the observed-defect → source-symbol chain.
+
+   Ambient, decorative, and on screen continuously, so the motion budget
+   is deliberately tiny: one 4.5s pass, one travelling highlight,
+   one arrival flash. Only transform / opacity / stroke-dashoffset are
+   animated, so nothing here triggers layout.
+   ------------------------------------------------------------------ */
+
+.cv-root {
+  position: relative;
+  width: 100%;
+  max-width: 620px;
+  /* The chain is intrinsically wide. Below ~460px it would scale the mono
+     labels into illegibility, so it scrolls instead of shrinking further —
+     nothing is clipped, nothing becomes unreadable. */
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+
+.cv-svg {
+  display: block;
+  width: 100%;
+  min-width: 460px;
+  height: auto;
+}
+
+/* --- backdrop ---------------------------------------------------- */
+
+.cv-grid-line {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 1;
+  opacity: 0.7;
+}
+
+.cv-grid-fill {
+  opacity: 0.7;
+}
+
+.cv-fade-in { stop-color: #ffffff; }
+.cv-fade-out { stop-color: #000000; }
+
+/* --- terminal halo ------------------------------------------------ */
+
+.cv-halo-core {
+  stop-color: var(--accent);
+  stop-opacity: 0.5;
+}
+.cv-halo-mid {
+  stop-color: var(--accent);
+  stop-opacity: 0.14;
+}
+.cv-halo-edge {
+  stop-color: var(--accent);
+  stop-opacity: 0;
+}
+
+.cv-halo {
+  opacity: 0.34;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cv-arrive 4.5s var(--ease) 2.85s 1 backwards;
+}
+
+/* --- connectors --------------------------------------------------- */
+
+/* Static dotted track. Every connector carries pathLength="100", so the
+   dash values below are percentages of the run and read identically on
+   all three segments regardless of their real geometry. */
+.cv-track {
+  fill: none;
+  stroke: var(--line-strong, var(--line));
+  stroke-width: 1.25;
+  stroke-linecap: round;
+  stroke-dasharray: 1.6 4;
+  opacity: 0.72;
+}
+
+.cv-arrow {
+  fill: var(--accent);
+  opacity: 0.4;
+}
+
+/* The travelling pulse: a short lit segment plus a blurred halo of the
+   same segment, offset slightly so the head reads brighter than the tail.
+
+   `backwards` fill matters here. Without it the staggered segments render
+   their base style during their animation-delay — a static lit dash parked
+   at the start of every path for the first two seconds after load. With it
+   they hold the 0% keyframe (off-path, transparent) until their turn. */
+.cv-pulse,
+.cv-pulse-glow {
+  fill: none;
+  stroke: var(--accent);
+  stroke-linecap: round;
+  animation-duration: 4.5s;
+  animation-timing-function: linear;
+  animation-iteration-count: 1;
+  animation-fill-mode: both;
+}
+
+.cv-pulse {
+  stroke-width: 1.75;
+  stroke-dasharray: 13 200;
+  animation-name: cv-flow;
+}
+
+/* Its own keyframes rather than a shared set: keyframe opacity overrides any
+   base opacity, so the halo needs its ceiling written into the frames. */
+.cv-pulse-glow {
+  stroke-width: 5;
+  stroke-dasharray: 17 200;
+  filter: url(#cv-soften);
+  animation-name: cv-flow-glow;
+}
+
+/* Staggered so the pulse hands off from segment to segment and crosses the
+   whole chain once in roughly three seconds. */
+.cv-seg-1 { animation-delay: 0s; }
+.cv-seg-2 { animation-delay: 0.99s; }
+.cv-seg-3 { animation-delay: 1.98s; }
+
+.cv-pulse-glow.cv-seg-1 { animation-delay: 0.03s; }
+.cv-pulse-glow.cv-seg-2 { animation-delay: 1.02s; }
+.cv-pulse-glow.cv-seg-3 { animation-delay: 2.01s; }
+
+/* --- nodes --------------------------------------------------------- */
+
+.cv-node-box {
+  fill: rgba(18, 24, 28, 0.92);
+  stroke: var(--line-strong, var(--line));
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.cv-node-dot {
+  fill: var(--quiet);
+}
+
+.cv-kind {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  fill: var(--quiet);
+}
+
+.cv-label {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  fill: var(--muted);
+}
+
+/* Hover highlight lives on its own overlay rect so hovering changes an
+   opacity, never a colour — keeps the animated-property rule intact. */
+.cv-node-hi {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Terminal node — the payoff. Brighter fill, accent border, live text. */
+.cv-node-terminal .cv-node-box {
+  fill: rgba(98, 213, 187, 0.07);
+  stroke: rgba(98, 213, 187, 0.55);
+}
+.cv-node-terminal .cv-node-dot { fill: var(--accent); }
+.cv-node-terminal .cv-label { fill: var(--text); }
+.cv-node-terminal .cv-kind { fill: var(--accent); }
+
+.cv-ring {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1;
+  opacity: 0.34;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: cv-arrive 4.5s var(--ease) 2.85s 1 backwards;
+}
+
+/* --- verified badge ------------------------------------------------ */
+
+.cv-badge-box {
+  fill: rgba(98, 213, 187, 0.08);
+  stroke: rgba(98, 213, 187, 0.4);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.cv-badge-text {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  fill: var(--accent);
+}
+
+.cv-badge-check {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* --- motion -------------------------------------------------------- */
+
+/* Travel occupies the first 22% of the pass; the remainder parks the dash
+   past the end of the path at zero opacity. */
+@keyframes cv-flow {
+  0%   { stroke-dashoffset: 13; opacity: 0; }
+  3%   { opacity: 1; }
+  17%  { opacity: 1; }
+  22%  { stroke-dashoffset: -100; opacity: 0; }
+  100% { stroke-dashoffset: -100; opacity: 0; }
+}
+
+@keyframes cv-flow-glow {
+  0%   { stroke-dashoffset: 13; opacity: 0; }
+  3%   { opacity: 0.34; }
+  17%  { opacity: 0.34; }
+  22%  { stroke-dashoffset: -100; opacity: 0; }
+  100% { stroke-dashoffset: -100; opacity: 0; }
+}
+
+@keyframes cv-arrive {
+  0%   { opacity: 0.34; transform: scale(1); }
+  7%   { opacity: 0.9;  transform: scale(1.05); }
+  34%  { opacity: 0.34; transform: scale(1); }
+  100% { opacity: 0.34; transform: scale(1); }
+}
+
+/* --- hover (gated: on touch an ungated :hover sticks after a tap) --- */
+
+@media (hover: hover) and (pointer: fine) {
+  .cv-node-hi {
+    transition: opacity 240ms var(--ease);
+  }
+  .cv-node:hover .cv-node-hi {
+    opacity: 0.55;
+  }
+  .cv-node-terminal:hover .cv-node-hi {
+    opacity: 0.85;
+  }
+}
+
+/* --- reduced motion ------------------------------------------------ */
+
+/* Stop the motion outright and settle into a fully drawn diagram: the pulse
+   paths become continuous lit connectors, the halo sits at its resting
+   brightness. No partial dashes, no frozen mid-transit state. */
+@media (prefers-reduced-motion: reduce) {
+  .cv-pulse,
+  .cv-pulse-glow,
+  .cv-halo,
+  .cv-ring {
+    animation: none;
+  }
+
+  .cv-pulse {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    opacity: 0.6;
+  }
+
+  .cv-pulse-glow {
+    stroke-dasharray: none;
+    stroke-dashoffset: 0;
+    opacity: 0.16;
+  }
+
+  .cv-halo,
+  .cv-ring {
+    opacity: 0.34;
+    transform: none;
+  }
+}

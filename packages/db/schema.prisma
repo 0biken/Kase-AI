@@ -15,41 +15,51 @@ model Project {
   defaultGatePolicyId String
   createdAt           DateTime @default(now())
 
-  organization     Organization @relation(fields: [organizationId], references: [id])
-  gatePolicies     GatePolicy[]
-  apiTokens        ApiToken[]
-  members          ProjectMember[]
-  repositories     Repository[]
-  targets          Target[]
-  scopePolicies    ScopePolicy[]
-  audits           Audit[]
+  organization      Organization      @relation(fields: [organizationId], references: [id])
+  gatePolicies      GatePolicy[]
+  apiTokens         ApiToken[]
+  members           ProjectMember[]
+  repositories      Repository[]
+  targets           Target[]
+  scopePolicies     ScopePolicy[]
+  audits            Audit[]
   findingIdentities FindingIdentity[]
-  waivers          Waiver[]
-  suppressions     Suppression[]
+  waivers           Waiver[]
+  suppressions      Suppression[]
+  secrets           Secret[]
 }
 
 model Repository {
-  id            String   @id
+  id            String  @id
   projectId     String
-  provider      String   // 'github'
+  provider      String // 'github'
   url           String
   defaultBranch String
   credentialId  String?
 
-  project       Project  @relation(fields: [projectId], references: [id])
+  project    Project @relation(fields: [projectId], references: [id])
+  credential Secret? @relation("RepositoryCredential", fields: [credentialId, projectId], references: [id, projectId], onDelete: Restrict)
+
+  @@index([projectId])
+  @@index([credentialId, projectId])
 }
 
 model Target {
-  id               String   @id
+  id               String  @id
   projectId        String
-  name             String   // "staging", "prod"
+  name             String // "staging", "prod"
   baseUrl          String
-  environment      String   // 'production' | 'staging' | 'beta' | 'local'
-  authMode         String   // 'none' | 'header' | 'cookie' | 'oauth' | 'form'
+  environment      String // 'production' | 'staging' | 'beta' | 'local'
+  authMode         String // 'none' | 'header' | 'cookie' | 'oauth' | 'form'
   authCredentialId String?
   buildInfoUrl     String?
 
-  project          Project  @relation(fields: [projectId], references: [id])
+  project        Project @relation(fields: [projectId], references: [id])
+  authCredential Secret? @relation("TargetCredential", fields: [authCredentialId, projectId], references: [id, projectId], onDelete: Restrict)
+  audits         Audit[]
+
+  @@index([projectId])
+  @@index([authCredentialId, projectId])
 }
 
 model ScopePolicy {
@@ -63,31 +73,38 @@ model ScopePolicy {
   authorizationAttestedBy String
   authorizationAttestedAt DateTime
 
-  project                 Project  @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
 }
 
 model Audit {
-  id                    String   @id
+  id                    String    @id
   projectId             String
-  mode                  String   // 'full' | 'smoke' | 'security' | 'regression'
-  status                String   // 'queued' | 'running' | 'completed' | 'partial' | 'failed' | 'cancelled'
-  degraded              Boolean  @default(false)
+  targetId              String?
+  idempotencyKey        String?
+  mode                  String // 'full' | 'smoke' | 'security' | 'regression'
+  status                String // 'queued' | 'running' | 'completed' | 'partial' | 'failed' | 'cancelled'
+  degraded              Boolean   @default(false)
   degradationReasons    String[]
   requestedCategories   String[]
   executedCategories    String[]
-  notExecutedCategories Json     // { category: string, reason: string }[]
+  notExecutedCategories Json // { category: string, reason: string }[]
   buildProvenanceId     String?
-  startedAt             DateTime @default(now())
+  startedAt             DateTime  @default(now())
   completedAt           DateTime?
 
-  project               Project  @relation(fields: [projectId], references: [id])
-  buildProvenance       BuildProvenance? @relation(fields: [buildProvenanceId], references: [id])
-  jobs                  AuditJob[]
-  evidence              Evidence[]
-  findings              Finding[]
-  correlations          Correlation[]
-  passingChecks         PassingCheck[]
-  gateEvaluations       GateEvaluation[]
+  project         Project          @relation(fields: [projectId], references: [id])
+  target          Target?          @relation(fields: [targetId], references: [id], onDelete: Restrict)
+  buildProvenance BuildProvenance? @relation(fields: [buildProvenanceId], references: [id])
+  jobs            AuditJob[]
+  evidence        Evidence[]
+  findings        Finding[]
+  correlations    Correlation[]
+  passingChecks   PassingCheck[]
+  gateEvaluations GateEvaluation[]
+
+  @@unique([projectId, idempotencyKey])
+  @@index([projectId, startedAt])
+  @@index([targetId])
 }
 
 model BuildProvenance {
@@ -96,28 +113,28 @@ model BuildProvenance {
   commitSha         String?
   branch            String?
   buildId           String?
-  source            String   // 'ci_supplied' | 'build_info_endpoint' | 'response_header' | 'assumed'
+  source            String // 'ci_supplied' | 'build_info_endpoint' | 'response_header' | 'assumed'
   verified          Boolean
   targetFingerprint String
   resolvedAt        DateTime @default(now())
 
-  audits            Audit[]
+  audits Audit[]
 }
 
 model AuditJob {
-  id          String   @id
-  auditId     String
-  kind        String    // 'recon' | 'blackbox_agent' | 'whitebox_agent' | 'tool' | 'correlate' | 'report'
-  category    String?
-  status      String    // 'queued' | 'running' | 'succeeded' | 'failed' | 'skipped' | 'timed_out'
-  dependsOn   String[]
-  attempts    Int       @default(0)
-  startedAt   DateTime?
-  finishedAt  DateTime?
-  error       String?
+  id         String    @id
+  auditId    String
+  kind       String // 'recon' | 'blackbox_agent' | 'whitebox_agent' | 'tool' | 'correlate' | 'report'
+  category   String?
+  status     String // 'queued' | 'running' | 'succeeded' | 'failed' | 'skipped' | 'timed_out'
+  dependsOn  String[]
+  attempts   Int       @default(0)
+  startedAt  DateTime?
+  finishedAt DateTime?
+  error      String?
 
-  audit       Audit     @relation(fields: [auditId], references: [id])
-  executions  ToolExecution[]
+  audit      Audit           @relation(fields: [auditId], references: [id])
+  executions ToolExecution[]
 }
 
 model ToolExecution {
@@ -133,7 +150,10 @@ model ToolExecution {
   requestCount  Int
   evidenceIds   String[]
 
-  job           AuditJob @relation(fields: [auditJobId], references: [id])
+  job      AuditJob   @relation(fields: [auditJobId], references: [id])
+  evidence Evidence[]
+
+  @@index([auditJobId])
 }
 
 model Evidence {
@@ -150,12 +170,66 @@ model Evidence {
   capturedAt      DateTime @default(now())
   metadata        Json
 
-  audit           Audit    @relation(fields: [auditId], references: [id])
+  audit           Audit             @relation(fields: [auditId], references: [id])
+  toolExecution   ToolExecution?    @relation(fields: [toolExecutionId], references: [id], onDelete: SetNull)
   findingEvidence FindingEvidence[]
+
+  @@index([auditId])
+  @@index([toolExecutionId])
+}
+
+// ---------------------------------------------------------------------------
+// Versioned envelope-encrypted secrets
+// ---------------------------------------------------------------------------
+
+/// Project-scoped metadata for a reusable credential. Revocation is retained
+/// as a timestamp so historical references and audit events remain resolvable.
+model Secret {
+  id             String    @id
+  projectId      String
+  name           String
+  kind           String
+  currentVersion Int       @default(1)
+  createdBy      String
+  createdAt      DateTime  @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime  @updatedAt @db.Timestamptz(3)
+  revokedAt      DateTime? @db.Timestamptz(3)
+
+  project      Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  versions     SecretVersion[]
+  repositories Repository[]    @relation("RepositoryCredential")
+  targets      Target[]        @relation("TargetCredential")
+
+  @@unique([projectId, name])
+  @@unique([id, projectId])
+  @@index([projectId, revokedAt])
+}
+
+/// Immutable encrypted payload. A new row is inserted for every rotation;
+/// ciphertext and wrapped-key material are bytea rather than encoded text.
+model SecretVersion {
+  id                String   @id
+  secretId          String
+  version           Int
+  ciphertext        Bytes
+  iv                Bytes
+  authTag           Bytes
+  wrappedDataKey    Bytes
+  wrappedDataKeyIv  Bytes
+  wrappedDataKeyTag Bytes
+  keyProvider       String
+  keyId             String
+  createdBy         String
+  createdAt         DateTime @default(now()) @db.Timestamptz(3)
+
+  secret Secret @relation(fields: [secretId], references: [id], onDelete: Cascade)
+
+  @@unique([secretId, version])
+  @@index([secretId, createdAt])
 }
 
 model EndpointInventory {
-  id        String   @id
+  id        String     @id
   endpoints Endpoint[]
 }
 
@@ -172,11 +246,11 @@ model Endpoint {
   firstSeenAuditId String
   lastSeenAuditId  String
 
-  inventory        EndpointInventory @relation(fields: [inventoryId], references: [id])
+  inventory EndpointInventory @relation(fields: [inventoryId], references: [id])
 }
 
 model CodeMap {
-  id           String   @id
+  id            String         @id
   routeMappings RouteMapping[]
 }
 
@@ -185,62 +259,62 @@ model RouteMapping {
   codeMapId      String
   method         String
   pathTemplate   String
-  framework      String   // 'nestjs' | 'express' | 'fastapi' | 'django'
+  framework      String // 'nestjs' | 'express' | 'fastapi' | 'django'
   handlerSymbol  String
   file           String
   line           Int
   middleware     String[]
   serviceSymbols String[]
-  source         String   // 'runtime_dump' | 'openapi' | 'static_parse'
+  source         String // 'runtime_dump' | 'openapi' | 'static_parse'
 
-  codeMap        CodeMap  @relation(fields: [codeMapId], references: [id])
+  codeMap CodeMap @relation(fields: [codeMapId], references: [id])
 }
 
 model FindingIdentity {
-  id               String   @id
+  id               String  @id
   projectId        String
-  fingerprint      String   @unique
-  status           String   // 'new' | 'open' | 'fixed' | 'verified' | 'regressed' | 'not_reproduced' | 'false_positive' | 'accepted_risk'
+  fingerprint      String  @unique
+  status           String // 'new' | 'open' | 'fixed' | 'verified' | 'regressed' | 'not_reproduced' | 'false_positive' | 'accepted_risk'
   firstSeenAuditId String
   lastSeenAuditId  String
   occurrences      Int
   currentSeverity  String
   waiverId         String?
 
-  project          Project  @relation(fields: [projectId], references: [id])
-  findings         Finding[]
+  project  Project   @relation(fields: [projectId], references: [id])
+  findings Finding[]
 }
 
 model Finding {
-  id               String   @id
-  auditId          String
-  identityId       String
-  origin           String   // 'blackbox' | 'whitebox' | 'tool' | 'correlated'
-  category         String
-  ruleId           String?
-  cwe              String?
-  title            String
-  severity         String
-  severitySource   String
-  affectedTarget   String?
-  description      String
-  reproduction     Json
-  impact           String
-  rootCause        String?
-  fix              String
-  fixPatch         String?
-  confidenceBand   String   // 'high' | 'medium' | 'low'
-  aiGenerated      Boolean
-  gateEligible     Boolean
+  id             String  @id
+  auditId        String
+  identityId     String
+  origin         String // 'blackbox' | 'whitebox' | 'tool' | 'correlated'
+  category       String
+  ruleId         String?
+  cwe            String?
+  title          String
+  severity       String
+  severitySource String
+  affectedTarget String?
+  description    String
+  reproduction   Json
+  impact         String
+  rootCause      String?
+  fix            String
+  fixPatch       String?
+  confidenceBand String // 'high' | 'medium' | 'low'
+  aiGenerated    Boolean
+  gateEligible   Boolean
 
-  audit            Audit           @relation(fields: [auditId], references: [id])
-  identity         FindingIdentity @relation(fields: [identityId], references: [id])
-  sourceLocations  SourceLocation[]
-  findingEvidence  FindingEvidence[]
+  audit           Audit             @relation(fields: [auditId], references: [id])
+  identity        FindingIdentity   @relation(fields: [identityId], references: [id])
+  sourceLocations SourceLocation[]
+  findingEvidence FindingEvidence[]
 }
 
 model SourceLocation {
-  id              String   @id
+  id              String  @id
   findingId       String
   file            String
   enclosingSymbol String
@@ -249,23 +323,23 @@ model SourceLocation {
   commitSha       String
   verified        Boolean
 
-  finding         Finding  @relation(fields: [findingId], references: [id])
+  finding Finding @relation(fields: [findingId], references: [id])
 }
 
 model Correlation {
-  id                     String   @id
+  id                     String  @id
   auditId                String
   blackboxFindingId      String
   whiteboxFindingId      String?
   endpointId             String?
   routeMappingId         String?
-  method                 String   // 'runtime_dump' | 'openapi' | 'static_parse' | 'request_id' | 'ai_inference'
+  method                 String // 'runtime_dump' | 'openapi' | 'static_parse' | 'request_id' | 'ai_inference'
   confidenceBand         String
   verified               Boolean
   rationale              String
   alternativesConsidered Json?
 
-  audit                  Audit    @relation(fields: [auditId], references: [id])
+  audit Audit @relation(fields: [auditId], references: [id])
 }
 
 model PassingCheck {
@@ -277,7 +351,7 @@ model PassingCheck {
   evidenceIds String[]
   observedAt  DateTime @default(now())
 
-  audit       Audit    @relation(fields: [auditId], references: [id])
+  audit Audit @relation(fields: [auditId], references: [id])
 }
 
 model GateEvaluation {
@@ -285,14 +359,14 @@ model GateEvaluation {
   auditId               String
   gatePolicyId          String
   gatePolicyVersion     Int
-  outcome               String   // 'pass' | 'fail' | 'partial'
+  outcome               String // 'pass' | 'fail' | 'partial'
   blockingFindingIds    String[]
   waivedFindingIds      String[]
   notExecutedCategories String[]
   commitSha             String?
   evaluatedAt           DateTime @default(now())
 
-  audit                 Audit    @relation(fields: [auditId], references: [id])
+  audit Audit @relation(fields: [auditId], references: [id])
 }
 
 model Waiver {
@@ -306,7 +380,7 @@ model Waiver {
   expiresAt       DateTime
   affectedRelease String?
 
-  project         Project  @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
 }
 
 model Suppression {
@@ -317,7 +391,7 @@ model Suppression {
   reason      String
   createdAt   DateTime @default(now())
 
-  project     Project  @relation(fields: [projectId], references: [id])
+  project Project @relation(fields: [projectId], references: [id])
 }
 
 // ---------------------------------------------------------------------------
@@ -335,9 +409,9 @@ model Organization {
   slug      String   @unique
   createdAt DateTime @default(now())
 
-  users     User[]
-  projects  Project[]
-  invites   Invite[]
+  users    User[]
+  projects Project[]
+  invites  Invite[]
 }
 
 model User {
@@ -347,22 +421,22 @@ model User {
   name           String?
   createdAt      DateTime @default(now())
 
-  organization   Organization @relation(fields: [organizationId], references: [id])
-  memberships    ProjectMember[]
+  organization Organization    @relation(fields: [organizationId], references: [id])
+  memberships  ProjectMember[]
 
   @@index([organizationId])
 }
 
 model GatePolicy {
-  id          String   @id
-  projectId   String
-  version     Int      @default(1)
-  name        String
+  id        String   @id
+  projectId String
+  version   Int      @default(1)
+  name      String
   // Only evidence-class-eligible findings may block — see ADR-002.
-  rules       Json
-  createdAt   DateTime @default(now())
+  rules     Json
+  createdAt DateTime @default(now())
 
-  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@unique([projectId, version])
   @@index([projectId])
@@ -379,10 +453,10 @@ model GatePolicy {
 model FindingEvidence {
   findingId  String
   evidenceId String
-  role       String   // 'primary' | 'supporting'
+  role       String // 'primary' | 'supporting'
 
-  finding    Finding  @relation(fields: [findingId], references: [id], onDelete: Cascade)
-  evidence   Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
+  finding  Finding  @relation(fields: [findingId], references: [id], onDelete: Cascade)
+  evidence Evidence @relation(fields: [evidenceId], references: [id], onDelete: Cascade)
 
   @@id([findingId, evidenceId])
   @@index([evidenceId])
@@ -391,12 +465,12 @@ model FindingEvidence {
 // Dedup relationships produced by the three-level matcher. POSSIBLE_MATCH
 // rows are the human triage queue and must not auto-resolve.
 model FindingRelation {
-  id            String   @id
-  fromFindingId String
-  toFindingId   String
-  kind          String   // 'match' | 'possible_match' | 'correlated_with'
+  id             String   @id
+  fromFindingId  String
+  toFindingId    String
+  kind           String // 'match' | 'possible_match' | 'correlated_with'
   confidenceBand String?
-  createdAt     DateTime @default(now())
+  createdAt      DateTime @default(now())
 
   @@unique([fromFindingId, toFindingId, kind])
   @@index([toFindingId])
@@ -421,7 +495,7 @@ model ApiToken {
   /// Leading chars of the plaintext, for listing tokens without revealing
   /// them. Display only — never used for lookup.
   displayPrefix String
-  role          String    // 'viewer' | 'operator' | 'approver' | 'admin'
+  role          String // 'viewer' | 'operator' | 'approver' | 'admin'
   createdBy     String
   createdAt     DateTime  @default(now())
   lastUsedAt    DateTime?
@@ -430,7 +504,7 @@ model ApiToken {
   /// referencing this token must keep resolving (17-security §9).
   revokedAt     DateTime?
 
-  project       Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
 }
@@ -443,11 +517,11 @@ model ApiToken {
 model ProjectMember {
   userId    String
   projectId String
-  role      String   // 'viewer' | 'operator' | 'approver' | 'admin'
+  role      String // 'viewer' | 'operator' | 'approver' | 'admin'
   createdAt DateTime @default(now())
 
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@id([userId, projectId])
   @@index([projectId])
@@ -461,15 +535,15 @@ model AuditTrailEvent {
   /// Nullable: a failed authentication has no project yet, but must still be
   /// recorded.
   projectId    String?
-  actorType    String   // 'user' | 'token' | 'system'
+  actorType    String // 'user' | 'token' | 'system'
   actorId      String?
-  action       String   // e.g. 'project.update', 'auth.denied', 'scope.denied'
+  action       String // e.g. 'project.update', 'auth.denied', 'scope.denied'
   resourceType String?
   resourceId   String?
   /// Before/after for mutations. §9 requires policy changes carry diffs.
   diff         Json?
   metadata     Json?
-  outcome      String   // 'allowed' | 'denied' | 'error'
+  outcome      String // 'allowed' | 'denied' | 'error'
   createdAt    DateTime @default(now())
 
   @@index([projectId, createdAt])
@@ -485,7 +559,7 @@ model Invite {
   email          String
   organizationId String
   /// Role granted on acceptance, for projects listed in `projectIds`.
-  role           String    // 'viewer' | 'operator' | 'approver' | 'admin'
+  role           String // 'viewer' | 'operator' | 'approver' | 'admin'
   /// Projects the invitee is enrolled into on acceptance. Empty is valid:
   /// an org member with no project access yet.
   projectIds     String[]
@@ -496,7 +570,7 @@ model Invite {
   acceptedUserId String?
   createdAt      DateTime  @default(now())
 
-  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   /// One live invite per email per org. Re-inviting an existing address
   /// updates that row rather than racing two acceptances.
