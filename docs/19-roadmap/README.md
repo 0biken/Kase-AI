@@ -69,7 +69,7 @@ That last check matters as much as the happy path — it proves the safety prope
 - Worker base images, egress policy, non-root hardening
 - Vulnerable fixture app
 
-The application slice is implemented. Live container acceptance remains open until the local Docker Linux engine is available; static security checks and API tests do not substitute for the Compose exit criterion.
+M1 is complete. The static gate and live Docker Compose proof pass: migrations apply to PostgreSQL, an API-dispatched audit stores content-addressed evidence in MinIO with a matching independently calculated SHA-256, denied egress fails closed with database and Squid records, and the non-root agent profile cannot reach the fixture directly or through the proxy.
 
 **Exit:** a job runs in a sandboxed worker and writes evidence to object storage.
 

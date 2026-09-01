@@ -122,4 +122,4 @@ Their `references/` payloads (`test-categories.md`, `whitebox-categories.md`, `f
 
 ## Status
 
-Product definition and technical design. No implementation yet. Start at [19 — Roadmap](docs/19-roadmap/README.md#2-the-first-vertical-slice).
+M1 is implemented and verified by both static checks and a live Docker Compose proof. The retained stack demonstrates live PostgreSQL migrations, API audit dispatch, correctly hashed MinIO evidence, fail-closed denied egress, and a non-root agent worker isolated from the target. M2 — the deterministic audit spine — is next; see [19 — Roadmap](docs/19-roadmap/README.md#3-milestones).

@@ -70,20 +70,24 @@ services:
     restart: "no"
 
   fixture:
-    image: node:22-alpine
-    working_dir: /app
-    volumes:
-      - ./fixtures/vulnerable-app:/app
+    image: kase/fixture:dev
+    build:
+      context: .
+      dockerfile: fixtures/vulnerable-app/Dockerfile
     environment:
       # main.ts binds PORT when run as an entrypoint; the spike imports
       # bootFixture() directly and picks an ephemeral port instead.
       PORT: 3000
       FIXTURE_COMMIT_SHA: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0
-    command: sh -c "npm install --no-audit --no-fund && npx tsx main.ts"
     ports:
       - "3001:3000"
     networks:
       - target-net
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/healthz').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   egress-proxy:
     image: ubuntu/squid:6.6-24.04_beta
@@ -95,14 +99,18 @@ services:
     read_only: true
     cap_drop:
       - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
     security_opt:
       - no-new-privileges:true
     tmpfs:
-      - /var/run/squid:size=16m,mode=0755
-      - /var/spool/squid:size=32m,mode=0755
-      - /var/log/squid:size=16m,mode=0755
+      - /run:size=16m,mode=0775,uid=13,gid=13
+      - /var/spool/squid:size=32m,mode=0755,uid=13,gid=13
+      - /var/log/squid:size=16m,mode=0755,uid=13,gid=13
     healthcheck:
-      test: ["CMD-SHELL", "squidclient -h 127.0.0.1 -p 3128 mgr:info >/dev/null 2>&1"]
+      test: ["CMD-SHELL", "test -s /run/squid.pid && kill -0 \"$(cat /run/squid.pid)\""]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -148,6 +156,7 @@ services:
         condition: service_completed_successfully
     networks:
       - kase-core
+      - api-host
 
   worker-recon:
     build:
@@ -185,7 +194,7 @@ services:
       egress-proxy:
         condition: service_healthy
       fixture:
-        condition: service_started
+        condition: service_healthy
     networks:
       - kase-core
       - recon-egress
@@ -229,6 +238,7 @@ volumes:
 networks:
   kase-core:
     internal: true
+  api-host:
   recon-egress:
     internal: true
   target-net:

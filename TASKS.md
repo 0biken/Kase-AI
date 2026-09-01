@@ -4,11 +4,11 @@ Executable form of [19 — Roadmap](docs/19-roadmap/README.md). Ordered by depen
 
 **Legend:** `[x]` done · `[~]` partially done · `[ ]` not started · **⚠** blocks other work
 
-**130 tasks, 15 done.** Counts include milestone exit criteria, which are the real gates.
+**130 tasks, 21 done.** Counts include milestone exit criteria, which are the real gates.
 
 | | Phase 0 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | Invariants |
 |---|---|---|---|---|---|---|---|---|---|
-| Done | 5 | 10 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Done | 5 | 16 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Total | 15 | 16 | 18 | 9 | 15 | 14 | 16 | 19 | 8 |
 
 ---
@@ -41,7 +41,7 @@ Non-code work that blocks code. Start the legal item this week; it has the longe
 
 ### Platform
 - [x] NestJS API scaffold with module boundaries matching the five subsystems
-- [x] Prisma schema from [03 — Data Model](docs/03-data-model/README.md), migrations committed — 26 models, initial migration generated offline via `migrate diff`; **not yet applied against a live Postgres**
+- [x] Prisma schema from [03 — Data Model](docs/03-data-model/README.md), migrations committed — 26 models, initial migration applied successfully against live PostgreSQL
 - [x] BullMQ + Redis wiring, queue topology, concurrency caps from [02 §7](docs/02-stack/README.md#7-concurrency-and-resource-defaults) — 7 queues by job kind, caps + per-queue timeouts, 19 tests
 - [x] MinIO/S3 client, bucket layout, content-addressed paths — bucket now created by a `minio-init` service
 - [x] Docker Compose: Postgres, Redis, MinIO, fixture target — volumes, healthchecks, and a working fixture entrypoint
@@ -53,15 +53,15 @@ Non-code work that blocks code. Start the legal item this week; it has the longe
 - [x] Secret storage with envelope encryption; rotation and revocation as API operations — metadata-only admin API, immutable versions, 32-byte local KEK provider
 
 ### Worker isolation
-- [~] `worker-base` image: non-root, seccomp profile, pinned versions — implemented; live image inspection blocked until Docker's Linux engine is available
-- [~] Per-family images (`recon`, `browser`, `sast`, `deps`, `agent`) — stages implemented; live builds pending
-- [~] Egress policy per image — recon-only proxy network implemented; agent has **no** target or proxy network; live denial test pending
-- [~] Secret injection via env/tmpfs, never baked into images or Redis payloads — implemented and unit-tested; live tmpfs inspection pending
+- [x] `worker-base` image: non-root, seccomp profile, pinned versions — live agent profile verified at UID `10001`
+- [x] Per-family images (`recon`, `browser`, `sast`, `deps`, `agent`) — stages build successfully in the Compose proof
+- [x] Egress policy per image — recon-only proxy network enforced; denied destination recorded by the audit trail and Squid; agent has no target or proxy reachability
+- [x] Secret injection via env/tmpfs, never baked into images or Redis payloads — unit and live-container checks pass
 - [x] Promote the spike fixture into `fixtures/vulnerable-app/` with Compose wiring
 
 **Exit criteria**
-- [~] A job dispatched via the API runs in a sandboxed worker and persists hashed evidence to object storage — application path implemented; Compose proof pending
-- [~] A worker denied egress to a non-allowlisted host fails closed and logs the denial — proxy and fail-closed path implemented; Compose proof pending
+- [x] A job dispatched via the API runs in a sandboxed worker and persists hashed evidence to object storage — MinIO bytes independently hash to `Evidence.sha256`
+- [x] A worker denied egress to a non-allowlisted host fails closed and logs the denial — failed audit, audit-trail event, and matching Squid denial verified
 
 ---
 

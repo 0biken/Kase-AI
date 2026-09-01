@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
-  [switch]$KeepStack
+  [switch]$KeepStack,
+  [switch]$SkipBuild
 )
 
 $ErrorActionPreference = 'Stop'
@@ -32,7 +33,7 @@ function Get-Sha256([string]$value) {
 }
 
 function Invoke-Psql([string]$sql) {
-  $value = & docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -At -U kase -d kase -c $sql
+  $value = $sql | & docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -At -U kase -d kase
   if ($LASTEXITCODE -ne 0) { throw 'Postgres command failed' }
   return ($value | Out-String).Trim()
 }
@@ -50,9 +51,6 @@ function Wait-Until([scriptblock]$Probe, [string]$Description, [int]$Seconds = 9
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
   throw 'Docker CLI is not available.'
 }
-$dockerConfig = Join-Path $env:TEMP 'kase-docker-proof-config'
-New-Item -ItemType Directory -Force -Path $dockerConfig | Out-Null
-$env:DOCKER_CONFIG = $dockerConfig
 $previousErrorPreference = $ErrorActionPreference
 $ErrorActionPreference = 'SilentlyContinue'
 & docker info *> $null
@@ -82,7 +80,11 @@ $tokenHash = Get-Sha256 $tokenPlaintext
 $secretName = "m1-proof-$([Guid]::NewGuid().ToString('N'))"
 
 try {
-  & docker compose up --build -d postgres redis minio minio-init fixture egress-proxy migrate api worker-recon
+  if ($SkipBuild) {
+    & docker compose up -d postgres redis minio minio-init fixture egress-proxy migrate api worker-recon
+  } else {
+    & docker compose up --build -d postgres redis minio minio-init fixture egress-proxy migrate api worker-recon
+  }
   if ($LASTEXITCODE -ne 0) { throw 'Compose stack did not start' }
 
   Wait-Until -Description 'API readiness' -Probe {
@@ -120,7 +122,7 @@ VALUES ('$tokenId', '$projectId', 'M1 proof', '$tokenHash', '$($tokenPlaintext.S
     } | ConvertTo-Json)
   if ($secret.PSObject.Properties.Name -contains 'value') { throw 'Secret API returned plaintext' }
 
-  Invoke-Psql "UPDATE \"Target\" SET \"authMode\"='header', \"authCredentialId\"='$($secret.id)' WHERE \"id\"='$targetId';" | Out-Null
+  Invoke-Psql "UPDATE `"Target`" SET `"authMode`"='header', `"authCredentialId`"='$($secret.id)' WHERE `"id`"='$targetId';" | Out-Null
 
   $audit = Invoke-RestMethod -Method Post -Uri "http://localhost:3002/api/v1/projects/$projectId/audits" -Headers ($headers + @{ 'Idempotency-Key' = [Guid]::NewGuid().ToString() }) -ContentType 'application/json' -Body (@{
       targetId = $targetId
@@ -129,13 +131,13 @@ VALUES ('$tokenId', '$projectId', 'M1 proof', '$tokenHash', '$($tokenPlaintext.S
     } | ConvertTo-Json)
 
   Wait-Until -Description 'successful recon audit' -Probe {
-    $status = Invoke-Psql "SELECT \"status\" FROM \"Audit\" WHERE \"id\"='$($audit.id)';"
+    $status = Invoke-Psql "SELECT `"status`" FROM `"Audit`" WHERE `"id`"='$($audit.id)';"
     if ($status -eq 'failed') { throw 'Allowed fixture audit failed' }
     if ($status -eq 'completed') { return $status }
     return $null
   } | Out-Null
 
-  $evidence = Invoke-Psql "SELECT \"artifactUri\" || '|' || \"sha256\" || '|' || \"sizeBytes\" FROM \"Evidence\" WHERE \"auditId\"='$($audit.id)';"
+  $evidence = Invoke-Psql "SELECT `"artifactUri`" || '|' || `"sha256`" || '|' || `"sizeBytes`" FROM `"Evidence`" WHERE `"auditId`"='$($audit.id)';"
   if (-not $evidence) { throw 'No evidence row was persisted' }
   $uri, $databaseSha, $databaseSize = $evidence.Split('|')
   $objectPath = $uri.Replace('s3://kase-evidence/', '')
@@ -145,7 +147,7 @@ VALUES ('$tokenId', '$projectId', 'M1 proof', '$tokenHash', '$($tokenPlaintext.S
   if ($objectSha -ne $databaseSha) { throw "Evidence hash mismatch: DB=$databaseSha object=$objectSha" }
   if ([int64]$databaseSize -le 0) { throw 'Evidence size is not positive' }
 
-  Invoke-Psql "UPDATE \"ScopePolicy\" SET \"allowedHosts\"=ARRAY['blocked.invalid'] WHERE \"id\"='$scopePolicyId'; INSERT INTO \"Target\" (\"id\", \"projectId\", \"name\", \"baseUrl\", \"environment\", \"authMode\") VALUES ('$blockedTargetId', '$projectId', 'blocked', 'http://blocked.invalid:3000', 'local', 'none');" | Out-Null
+  Invoke-Psql "UPDATE `"ScopePolicy`" SET `"allowedHosts`"=ARRAY['blocked.invalid'] WHERE `"id`"='$scopePolicyId'; INSERT INTO `"Target`" (`"id`", `"projectId`", `"name`", `"baseUrl`", `"environment`", `"authMode`") VALUES ('$blockedTargetId', '$projectId', 'blocked', 'http://blocked.invalid:3000', 'local', 'none');" | Out-Null
   $blockedAudit = Invoke-RestMethod -Method Post -Uri "http://localhost:3002/api/v1/projects/$projectId/audits" -Headers ($headers + @{ 'Idempotency-Key' = [Guid]::NewGuid().ToString() }) -ContentType 'application/json' -Body (@{
       targetId = $blockedTargetId
       mode = 'smoke'
@@ -153,14 +155,15 @@ VALUES ('$tokenId', '$projectId', 'M1 proof', '$tokenHash', '$($tokenPlaintext.S
     } | ConvertTo-Json)
 
   Wait-Until -Description 'fail-closed denied audit' -Probe {
-    $status = Invoke-Psql "SELECT \"status\" FROM \"Audit\" WHERE \"id\"='$($blockedAudit.id)';"
+    $status = Invoke-Psql "SELECT `"status`" FROM `"Audit`" WHERE `"id`"='$($blockedAudit.id)';"
     if ($status -eq 'completed') { throw 'Non-allowlisted proxy destination unexpectedly completed' }
     if ($status -eq 'failed') { return $status }
     return $null
   } | Out-Null
-  $denialCount = Invoke-Psql "SELECT count(*) FROM \"AuditTrailEvent\" WHERE \"resourceId\"='$($blockedAudit.id)' AND \"action\"='worker.egress.denied' AND \"outcome\"='denied';"
+  $denialCount = Invoke-Psql "SELECT count(*) FROM `"AuditTrailEvent`" WHERE `"resourceId`"='$($blockedAudit.id)' AND `"action`"='worker.egress.denied' AND `"outcome`"='denied';"
   if ([int]$denialCount -lt 1) { throw 'Worker egress denial was not written to the audit trail' }
-  $proxyLog = & docker compose logs --no-color egress-proxy
+  $proxyLog = & docker compose exec -T --user 13:13 egress-proxy cat /var/log/squid/access.log
+  if ($LASTEXITCODE -ne 0) { throw 'Proxy access log could not be read' }
   if (($proxyLog | Out-String) -notmatch 'blocked\.invalid') { throw 'Proxy denial log does not mention blocked.invalid' }
 
   & docker compose --profile security-check run --rm worker-agent-check

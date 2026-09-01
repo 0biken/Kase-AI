@@ -1,6 +1,9 @@
 # syntax=docker/dockerfile:1.7
 FROM node:22.14.0-bookworm-slim AS builder
 WORKDIR /workspace
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends openssl \
+    && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
 COPY . .
 RUN pnpm install --filter @kase/api... --frozen-lockfile
@@ -9,7 +12,7 @@ RUN pnpm --filter @kase/db run generate && pnpm --filter @kase/api run build
 FROM node:22.14.0-bookworm-slim AS worker-base
 ARG EXPECTED_CURL_VERSION=7.88.1
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates curl tini \
+    && apt-get install -y --no-install-recommends ca-certificates curl openssl tini \
     && curl --version | head -n 1 | grep -F "curl ${EXPECTED_CURL_VERSION}" \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd --gid 10001 kase \
