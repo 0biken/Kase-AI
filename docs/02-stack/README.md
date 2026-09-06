@@ -1,6 +1,6 @@
 # 02 — Technology Stack
 
-Locked choices, rationale, and the two decisions that need clearing before implementation.
+Locked choices, rationale, and implementation constraints.
 
 ---
 
@@ -20,7 +20,7 @@ Locked choices, rationale, and the two decisions that need clearing before imple
 | Accessibility | axe-core | |
 | Performance | Lighthouse CLI | |
 | Crawling / recon | Katana, httpx | ProjectDiscovery, MIT |
-| SAST | Semgrep OSS | **See §3 — licensing gate** |
+| SAST | Semgrep Community Edition engine | **See §3 — first-party rules only** |
 | Secret scanning | gitleaks | |
 | Dependency scanning | `npm audit`, `pip-audit`, OSV | |
 | AI abstraction | Provider interface (Anthropic, OpenAI) | See [11](../11-ai-layer/README.md) |
@@ -62,19 +62,13 @@ worker-base          Alpine/Debian slim, non-root, seccomp profile
 
 Tool versions are pinned per image tag and recorded on every `ToolExecution` so findings remain explainable after an upgrade.
 
-## 3. Open item: Semgrep licensing
+## 3. Semgrep distribution policy
 
-**Status: must be cleared before Semgrep becomes load-bearing.**
+**Status: decided.** Kase may bundle the LGPL-2.1-licensed Semgrep Community Edition engine, together with the required license notices and source attribution. The engine and the [Semgrep Registry rules](https://semgrep.dev/legal/rules-license/) have separate terms: Kase does **not** ship, mirror, fetch, or serve Registry rules, Community Edition packs, Semgrep Pro rules, registry aliases such as `p/default`, or remote rule URLs. See the [engine license](https://github.com/semgrep/semgrep) and ADR-015 for the decision record. This product policy records Kase's distribution boundary; it is not external legal advice.
 
-The Semgrep OSS engine and the Semgrep rule registry are licensed separately. The engine is open source; the registry rulesets and anything Semgrep Pro carry their own terms, and bundling them into a commercial product is not automatically permitted.
+The only built-in v1 rule pack is `kase/typescript-security@1.0.0`. It is Kase-owned and contains exactly one initial rule, `kase.idor.missing-ownership-predicate`, derived from the proven correlation spike. [`rules/manifest.json`](../../rules/manifest.json) is the machine-readable authority. A static guard rejects any unapproved pack, origin, registry alias, remote URL, Community Edition pack, Pro rule, or Semgrep-authored rule before release.
 
-Actions:
-
-1. Legal review of the specific rulesets Kase intends to ship.
-2. If registry rules cannot be redistributed, either (a) ship only first-party Kase rules plus permissively licensed community rules, or (b) require customers to supply their own Semgrep entitlement.
-3. Keep the SAST adapter engine-agnostic so a swap remains cheap.
-
-Swapping SAST engines after the finding schema, fingerprints, and gate policies depend on a specific rule-ID namespace is expensive. Clear this early.
+Customers may upload YAML rule packs only when they have the right to use them. Each upload is tenant-scoped, content-addressed by immutable SHA-256, and records its name, version, provenance, license label, attesting actor, and attestation time. Kase records that attestation but does not adjudicate it. Customer packs are never shared across tenants and are never fetched from the Semgrep Registry. The SAST adapter receives only a resolved local rule-pack reference and emits Kase-normalized findings, keeping Semgrep-specific namespaces out of downstream finding identity and policy. The complete contract is in [07 — Tool Adapters §4.8](../07-tool-adapters/README.md#48-semgrep--sast).
 
 Licensing of the rest of the tool set is unproblematic: Katana, httpx, nuclei, ffuf (Apache/MIT), gitleaks (MIT), axe-core (MPL-2.0), Lighthouse (Apache-2.0), Playwright (Apache-2.0).
 

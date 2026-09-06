@@ -1,23 +1,39 @@
-import { InjectQueue } from '@nestjs/bullmq';
 import { Injectable } from '@nestjs/common';
-import { Queue } from 'bullmq';
 import { PrismaService } from '../prisma/prisma.service';
-import { QUEUE_RECON } from '../queue/queue.constants';
 import { ProblemException } from '../common/problem-details';
 import { isHostAllowed } from '../common/host-pattern';
 import { newId } from '../common/ids';
 import { AuditTrailService } from '../audit-trail/audit-trail.service';
 import type { Actor } from '../projects/projects.service';
 import type { CreateAuditDto } from './dto/create-audit.dto';
-import type { ReconAuditJobPayload } from './audit-job.payload';
+import { graphTemplate } from './job-graph';
+import { DurableQueueDispatcher } from '../queue/durable-queue-dispatcher';
 
 @Injectable()
 export class OrchestratorService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly trail: AuditTrailService,
-    @InjectQueue(QUEUE_RECON) private readonly reconQueue: Queue<ReconAuditJobPayload>,
+    private readonly queues: DurableQueueDispatcher,
   ) {}
+
+  list(projectId: string) {
+    return this.prisma.audit.findMany({
+      where: { projectId }, orderBy: { startedAt: 'desc' }, take: 100,
+      include: { jobs: true },
+    });
+  }
+
+  async detail(projectId: string, auditId: string) {
+    const audit = await this.prisma.audit.findFirst({ where: { id: auditId, projectId }, include: { jobs: true } });
+    if (!audit) throw new ProblemException('NOT_FOUND', 'Audit does not belong to this project');
+    return audit;
+  }
+
+  async jobs(projectId: string, auditId: string) {
+    await this.detail(projectId, auditId);
+    return this.prisma.auditJob.findMany({ where: { auditId }, orderBy: { id: 'asc' } });
+  }
 
   async dispatch(projectId: string, dto: CreateAuditDto, idempotencyKey: string, actor: Actor) {
     if (!idempotencyKey?.trim()) {
@@ -30,19 +46,43 @@ export class OrchestratorService {
     });
     if (existing) return existing;
 
-    const target = await this.prisma.target.findFirst({
+    const requestedCategories = dto.mode === 'smoke'
+      ? [dto.category ?? dto.categories?.[0] ?? 'fixture_health']
+      : [...new Set(dto.categories?.length ? dto.categories : dto.mode === 'full' ? ['sast', 'http'] : ['sast'])];
+    const allowedCategories = dto.mode === 'smoke' ? ['fixture_health'] : dto.mode === 'security' ? ['sast'] : ['sast', 'http'];
+    const unsupported = requestedCategories.filter((category) => !allowedCategories.includes(category));
+    if (unsupported.length > 0) {
+      throw new ProblemException('VALIDATION_FAILED', `Unsupported ${dto.mode} categories: ${unsupported.join(', ')}`);
+    }
+    if (!dto.targetId && !dto.repositoryId) {
+      throw new ProblemException('VALIDATION_FAILED', 'targetId or repositoryId is required');
+    }
+    if (dto.mode === 'smoke' && !dto.targetId) {
+      throw new ProblemException('VALIDATION_FAILED', 'Smoke audits require targetId');
+    }
+    if (dto.mode !== 'smoke' && !dto.repositoryId) {
+      throw new ProblemException('VALIDATION_FAILED', 'Security audits require repositoryId');
+    }
+    if (requestedCategories.includes('http') && !dto.targetId) {
+      throw new ProblemException('VALIDATION_FAILED', 'Full audits require targetId for the HTTP category');
+    }
+
+    const target = dto.targetId ? await this.prisma.target.findFirst({
       where: { id: dto.targetId, projectId },
-    });
-    if (!target) throw new ProblemException('NOT_FOUND', 'Target does not belong to this project');
+    }) : null;
+    if (dto.targetId && !target) throw new ProblemException('NOT_FOUND', 'Target does not belong to this project');
+    const repository = dto.repositoryId ? await (this.prisma.repository as any).findFirst({
+      where: { id: dto.repositoryId, projectId },
+    }) : null;
+    if (dto.repositoryId && !repository) throw new ProblemException('NOT_FOUND', 'Repository does not belong to this project');
 
-    const policy = await this.prisma.scopePolicy.findFirst({
-      where: { projectId },
-      orderBy: { authorizationAttestedAt: 'desc' },
-    });
-    if (!policy) throw new ProblemException('ATTESTATION_REQUIRED', 'An attested scope policy is required');
+    const policy = target ? await this.prisma.scopePolicy.findFirst({
+      where: { projectId }, orderBy: { authorizationAttestedAt: 'desc' },
+    }) : null;
+    if (target && !policy) throw new ProblemException('ATTESTATION_REQUIRED', 'An attested scope policy is required');
 
-    const host = new URL(target.baseUrl).hostname.toLowerCase();
-    if (!isHostAllowed(host, policy.allowedHosts)) {
+    const host = target ? new URL(target.baseUrl).hostname.toLowerCase() : null;
+    if (target && policy && !isHostAllowed(host!, policy.allowedHosts)) {
       await this.trail.record({
         projectId,
         actorType: actor.type,
@@ -50,13 +90,13 @@ export class OrchestratorService {
         action: 'scope.denied',
         resourceType: 'Target',
         resourceId: target.id,
-        metadata: { host, reason: 'host_not_allowed', source: 'audit.dispatch' },
+          metadata: { host, reason: 'host_not_allowed', source: 'audit.dispatch' },
         outcome: 'denied',
       });
       throw new ProblemException('SCOPE_VIOLATION', `Target host "${host}" is not allowlisted`);
     }
 
-    if (target.authCredentialId) {
+    if (target?.authCredentialId) {
       const usable = await this.prisma.secret.count({
         where: { id: target.authCredentialId, projectId, revokedAt: null },
       });
@@ -66,45 +106,51 @@ export class OrchestratorService {
     }
 
     const auditId = newId('audit');
-    const auditJobId = newId('auditJob');
+    const templates = graphTemplate(
+      dto.mode,
+      dto.mode === 'smoke' ? undefined : requestedCategories as Array<'sast' | 'http'>,
+    );
+    const jobIds = new Map(templates.map((template) => [template.kind, newId('auditJob')]));
     const audit = await this.prisma.$transaction(async (tx) => {
       await tx.audit.create({
         data: {
           id: auditId,
           projectId,
-          targetId: target.id,
+          targetId: target?.id ?? null,
+          repositoryId: repository?.id ?? null,
+          requestedCommitSha: dto.commitSha ?? null,
           idempotencyKey,
           mode: dto.mode,
           status: 'queued',
           degradationReasons: [],
-          requestedCategories: [dto.category],
+          requestedCategories,
           executedCategories: [],
           notExecutedCategories: [],
         },
       });
-      await tx.auditJob.create({
-        data: {
-          id: auditJobId,
-          auditId,
-          kind: 'recon',
-          category: dto.category,
+      for (const template of templates) {
+        await tx.auditJob.create({ data: {
+          id: jobIds.get(template.kind)!, auditId, kind: template.kind,
+          category: template.kind === 'recon' ? requestedCategories[0] : template.category,
           status: 'queued',
-          dependsOn: [],
-        },
-      });
+          dependsOn: template.dependsOnKinds.map((kind) => jobIds.get(kind)!),
+          timeoutMs: Math.min(template.timeoutMs, dto.maxWallTimeMs ?? template.timeoutMs),
+          required: template.required,
+        } });
+      }
       return tx.audit.findUniqueOrThrow({ where: { id: auditId }, include: { jobs: true } });
     });
 
     try {
-      await this.reconQueue.add(
-        'fixture-health',
-        { auditId, auditJobId, projectId },
-        { jobId: auditJobId },
-      );
+      const first = templates[0];
+      const auditJobId = jobIds.get(first.kind)!;
+      const payload = { auditId, auditJobId, projectId };
+      if (dto.mode === 'smoke') await this.queues.enqueue('recon', payload);
+      else await this.queues.wakeScheduler(payload);
     } catch (error) {
       await this.prisma.$transaction([
         this.prisma.auditJob.update({
-          where: { id: auditJobId },
+          where: { id: jobIds.get(templates[0].kind)! },
           data: { status: 'failed', error: 'Queue dispatch failed', finishedAt: new Date() },
         }),
         this.prisma.audit.update({
@@ -122,7 +168,7 @@ export class OrchestratorService {
       action: 'audit.dispatch',
       resourceType: 'Audit',
       resourceId: auditId,
-      metadata: { targetId: target.id, mode: dto.mode, category: dto.category },
+      metadata: { targetId: target?.id, repositoryId: repository?.id, mode: dto.mode, categories: requestedCategories },
       outcome: 'allowed',
     });
     return audit;

@@ -13,7 +13,7 @@ model Project {
   name                String
   slug                String   @unique
   defaultGatePolicyId String
-  createdAt           DateTime @default(now())
+  createdAt           DateTime @default(now()) @db.Timestamptz(3)
 
   organization      Organization      @relation(fields: [organizationId], references: [id])
   gatePolicies      GatePolicy[]
@@ -27,6 +27,7 @@ model Project {
   waivers           Waiver[]
   suppressions      Suppression[]
   secrets           Secret[]
+  evidenceRetentionOverride ProjectEvidenceRetentionOverride?
 }
 
 model Repository {
@@ -39,6 +40,7 @@ model Repository {
 
   project    Project @relation(fields: [projectId], references: [id])
   credential Secret? @relation("RepositoryCredential", fields: [credentialId, projectId], references: [id, projectId], onDelete: Restrict)
+  audits     Audit[]
 
   @@index([projectId])
   @@index([credentialId, projectId])
@@ -80,6 +82,8 @@ model Audit {
   id                    String    @id
   projectId             String
   targetId              String?
+  repositoryId          String?
+  requestedCommitSha    String?
   idempotencyKey        String?
   mode                  String // 'full' | 'smoke' | 'security' | 'regression'
   status                String // 'queued' | 'running' | 'completed' | 'partial' | 'failed' | 'cancelled'
@@ -89,27 +93,32 @@ model Audit {
   executedCategories    String[]
   notExecutedCategories Json // { category: string, reason: string }[]
   buildProvenanceId     String?
-  startedAt             DateTime  @default(now())
-  completedAt           DateTime?
+  cancellationRequestedAt DateTime? @db.Timestamptz(3)
+  startedAt             DateTime  @default(now()) @db.Timestamptz(3)
+  completedAt           DateTime? @db.Timestamptz(3)
 
   project         Project          @relation(fields: [projectId], references: [id])
   target          Target?          @relation(fields: [targetId], references: [id], onDelete: Restrict)
-  buildProvenance BuildProvenance? @relation(fields: [buildProvenanceId], references: [id])
+  repository      Repository?      @relation(fields: [repositoryId], references: [id], onDelete: Restrict)
+  buildProvenance BuildProvenance? @relation("SelectedBuildProvenance", fields: [buildProvenanceId], references: [id])
+  provenanceRecord BuildProvenance? @relation("BuildProvenanceOwner")
   jobs            AuditJob[]
   evidence        Evidence[]
   findings        Finding[]
   correlations    Correlation[]
   passingChecks   PassingCheck[]
   gateEvaluations GateEvaluation[]
+  events          AuditEvent[]
 
   @@unique([projectId, idempotencyKey])
   @@index([projectId, startedAt])
   @@index([targetId])
+  @@index([repositoryId])
 }
 
 model BuildProvenance {
   id                String   @id
-  auditId           String
+  auditId           String   @unique
   commitSha         String?
   branch            String?
   buildId           String?
@@ -118,7 +127,8 @@ model BuildProvenance {
   targetFingerprint String
   resolvedAt        DateTime @default(now())
 
-  audits Audit[]
+  audit  Audit   @relation("BuildProvenanceOwner", fields: [auditId], references: [id], onDelete: Cascade)
+  audits Audit[] @relation("SelectedBuildProvenance")
 }
 
 model AuditJob {
@@ -129,12 +139,38 @@ model AuditJob {
   status     String // 'queued' | 'running' | 'succeeded' | 'failed' | 'skipped' | 'timed_out'
   dependsOn  String[]
   attempts   Int       @default(0)
-  startedAt  DateTime?
-  finishedAt DateTime?
+  timeoutMs  Int
+  maxRetries Int       @default(2)
+  required   Boolean   @default(true)
+  enqueuedAt DateTime? @db.Timestamptz(3)
+  startedAt  DateTime? @db.Timestamptz(3)
+  finishedAt DateTime? @db.Timestamptz(3)
+  heartbeatAt DateTime? @db.Timestamptz(3)
+  leaseExpiresAt DateTime? @db.Timestamptz(3)
   error      String?
+  errorClass String?
 
   audit      Audit           @relation(fields: [auditId], references: [id])
   executions ToolExecution[]
+
+  @@index([auditId, status])
+  @@index([leaseExpiresAt])
+}
+
+/// Ordered, durable audit progress. The sequence is allocated while the
+/// corresponding Audit row is locked, making Last-Event-ID resumable.
+model AuditEvent {
+  id        String   @id
+  auditId   String
+  sequence  Int
+  type      String
+  data      Json
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  audit Audit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  @@unique([auditId, sequence])
+  @@index([auditId, createdAt])
 }
 
 model ToolExecution {
@@ -163,11 +199,18 @@ model Evidence {
   tool            String
   type            String
   replayable      Boolean
-  artifactUri     String
+  artifactUri     String?
   sha256          String
+  fullRedactedSha256 String?
   sizeBytes       Int
+  truncated       Boolean  @default(false)
   redacted        Boolean
-  capturedAt      DateTime @default(now())
+  capturedAt      DateTime @default(now()) @db.Timestamptz(3)
+  expiresAt       DateTime @db.Timestamptz(3)
+  objectDeletedAt DateTime? @db.Timestamptz(3)
+  tombstonedAt    DateTime? @db.Timestamptz(3)
+  deletionLeaseId String?
+  deletionLeaseExpiresAt DateTime? @db.Timestamptz(3)
   metadata        Json
 
   audit           Audit             @relation(fields: [auditId], references: [id])
@@ -175,6 +218,7 @@ model Evidence {
   findingEvidence FindingEvidence[]
 
   @@index([auditId])
+  @@index([auditId, type])
   @@index([toolExecutionId])
 }
 
@@ -273,7 +317,7 @@ model RouteMapping {
 model FindingIdentity {
   id               String  @id
   projectId        String
-  fingerprint      String  @unique
+  fingerprint      String
   status           String // 'new' | 'open' | 'fixed' | 'verified' | 'regressed' | 'not_reproduced' | 'false_positive' | 'accepted_risk'
   firstSeenAuditId String
   lastSeenAuditId  String
@@ -283,6 +327,9 @@ model FindingIdentity {
 
   project  Project   @relation(fields: [projectId], references: [id])
   findings Finding[]
+
+  @@unique([projectId, fingerprint])
+  @@index([projectId, status, currentSeverity])
 }
 
 model Finding {
@@ -311,6 +358,9 @@ model Finding {
   identity        FindingIdentity   @relation(fields: [identityId], references: [id])
   sourceLocations SourceLocation[]
   findingEvidence FindingEvidence[]
+
+  @@unique([auditId, identityId])
+  @@index([auditId, category, severity])
 }
 
 model SourceLocation {
@@ -407,11 +457,13 @@ model Organization {
   id        String   @id
   name      String
   slug      String   @unique
-  createdAt DateTime @default(now())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   users    User[]
   projects Project[]
   invites  Invite[]
+  members  OrganizationMember[]
+  evidenceRetentionPolicy EvidenceRetentionPolicy?
 }
 
 model User {
@@ -419,12 +471,56 @@ model User {
   organizationId String
   email          String   @unique
   name           String?
-  createdAt      DateTime @default(now())
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
 
   organization Organization    @relation(fields: [organizationId], references: [id])
   memberships  ProjectMember[]
+  organizationMemberships OrganizationMember[]
 
   @@index([organizationId])
+}
+
+/// Organization-level authorization is deliberately distinct from project
+/// roles. API tokens never receive one of these memberships.
+model OrganizationMember {
+  userId         String
+  organizationId String
+  role           String // 'member' | 'admin'
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@id([userId, organizationId])
+  @@index([organizationId, role])
+}
+
+/// Organization defaults. Database checks in the M2 migration enforce the
+/// inclusive 1..365 range for every independently configurable class.
+model EvidenceRetentionPolicy {
+  organizationId            String   @id
+  replayableEvidenceDays     Int      @default(90)
+  nonReplayableEvidenceDays  Int      @default(30)
+  rawToolOutputDays          Int      @default(30)
+  agentTranscriptDays        Int      @default(30)
+  updatedBy                  String
+  updatedAt                  DateTime @updatedAt @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+}
+
+/// Nullable values restore inheritance for that evidence class. A row may
+/// remain when all values are null so the policy audit trail stays explicit.
+model ProjectEvidenceRetentionOverride {
+  projectId                   String   @id
+  replayableEvidenceDays      Int?
+  nonReplayableEvidenceDays   Int?
+  rawToolOutputDays           Int?
+  agentTranscriptDays         Int?
+  updatedBy                   String
+  updatedAt                   DateTime @updatedAt @db.Timestamptz(3)
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }
 
 model GatePolicy {

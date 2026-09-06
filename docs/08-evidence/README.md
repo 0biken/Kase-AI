@@ -20,17 +20,24 @@ Evidence {
   tool: string
   type: EvidenceType
   replayable: boolean
-  artifactUri: string        // s3://bucket/<projectId>/<auditId>/<sha256>
-  sha256: string             // content address
+  artifactUri: string | null // s3://bucket/<projectId>/<auditId>/<sha256>; null after expiry
+  sha256: string             // hash of the stored, redacted bytes
+  fullRedactedSha256: string | null // full redacted stream when stored bytes are truncated
   sizeBytes: number
   truncated: boolean
   redacted: boolean
   capturedAt: DateTime
-  metadata: Json             // type-specific
+  expiresAt: DateTime
+  objectDeletedAt: DateTime | null
+  tombstonedAt: DateTime | null
+  metadata: Json             // type-specific and safe for indefinite retention
 }
 ```
 
-Artifacts are **content-addressed**: the object key is the SHA-256 of the payload. Re-running an idempotent job overwrites identically instead of duplicating, which is what makes audit resumption safe.
+Artifacts are **content-addressed**: the object key is the SHA-256 of the bytes
+actually stored after mandatory redaction and any truncation. Re-running an
+idempotent job resolves to the same object instead of duplicating it, which is
+what makes audit resumption safe.
 
 ## 3. Evidence types
 
@@ -76,7 +83,10 @@ Requiring "at least two evidence artifacts" is weak: two screenshots of the same
 
 ## 5. Redaction
 
-Redaction happens **at capture time, in the worker**, before the artifact is written. Post-hoc redaction of stored objects is not treated as sufficient.
+Redaction is **mandatory and non-disableable**. It happens at capture time in the
+worker, before truncation, hashing, or upload. Post-hoc redaction of stored
+objects is not sufficient, and neither an organization nor a project can weaken
+the baseline. Customer-defined patterns are additive.
 
 ### Registered secrets
 
@@ -103,19 +113,50 @@ Applied in addition, for secrets Kase does not know about:
 | Connection strings | `postgres://user:pass@...` |
 | Provider tokens | GitHub, Slack, Stripe prefixes |
 | Kase API tokens | `kase_...` — 14 §2 |
+| Payment cards | PAN-like values that pass checksum validation |
+| Government IDs | supported country-specific identifier formats |
+| Ordinary PII | email addresses, phone numbers, and IP addresses |
+
+Sensitive request and response headers and all cookie values are redacted by
+field name even when their value does not match a known pattern. Ordinary PII is
+replaced with a stable **per-audit pseudonym**, derived with an audit-scoped HMAC
+key, so repeated values can still be correlated within one audit. Pseudonyms are
+not stable across audits, and neither the source PII nor the HMAC key is stored
+with evidence.
 
 ### Secret-scanner output is special-cased
 
-`gitleaks` findings deliberately contain secrets. The adapter stores rule, file, enclosing symbol, line, and a partial fingerprint of the match — **never the matched value**. A finding that leaks the secret it is reporting has made the problem worse.
+Secret-scanner findings deliberately contain secrets. The adapter stores rule,
+file, enclosing symbol, line, and a keyed partial fingerprint of the match —
+**never the raw match, surrounding secret-bearing excerpt, or reversible
+encoding**. A finding that leaks the secret it is reporting has made the problem
+worse.
 
 `Evidence.redacted` records whether any redaction occurred, so reviewers know an artifact is not byte-identical to the raw stream.
+
+### Processing and hashing order
+
+The worker applies registered-secret replacement, sensitive header/cookie
+filtering, baseline and customer patterns, and ordinary-PII pseudonymization to
+the complete capture stream. It then hashes that full redacted stream. If a cap
+requires truncation, it stores the truncated redacted bytes, sets `truncated:
+true`, records their hash in `sha256`, and records the pre-truncation redacted
+hash in `fullRedactedSha256`. Only the stored-byte hash is used in the object key.
+Untruncated evidence has `fullRedactedSha256: null` because `sha256` already
+covers the full redacted content.
+
+Binary evidence is admitted only when its capture adapter can prove the baseline
+redaction policy was applied safely. An unsafe screenshot, trace, archive, or
+other opaque binary is dropped rather than uploaded; Kase emits
+`evidence.capture_rejected`, adds a safe reason to `Audit.degradationReasons`,
+and sets `Audit.degraded = true`.
 
 ## 6. Size limits and truncation
 
 | Type | Cap | Behaviour on exceed |
 |---|---|---|
-| `http_exchange` body | 1 MB | Truncate, hash full payload, set `truncated: true` |
-| `trace` | 50 MB | Drop trace, keep console + network, log degradation |
+| `http_exchange` body | 1 MB | Redact, hash full redacted payload, truncate, set `truncated: true` |
+| `trace` | 50 MB | Drop trace, keep safely redacted console + network, mark audit degraded |
 | `network_log` | 10 MB | Truncate oldest entries |
 | Any single artifact | 100 MB | Reject, mark job degraded |
 | Total per audit | 5 GB | Stop capturing non-replayable evidence first |
@@ -125,11 +166,11 @@ Under pressure, **replayable evidence is preserved and non-replayable evidence i
 ## 7. Immutability and integrity
 
 - Bucket objects are write-once; the storage policy denies overwrite and delete to the application role.
-- `sha256` is computed in the worker before upload and re-verified on read.
+- `sha256` is computed over stored redacted bytes before upload and re-verified on read.
 - Integrity failure on read marks the evidence `corrupt` and any finding depending solely on it becomes non-gate-eligible.
 - Deletion happens only through the retention job, which writes a tombstone rather than removing the row.
 
-## 8. Retention and tombstones
+## 8. Retention, inheritance, and tombstones
 
 | Data | Retention |
 |---|---|
@@ -137,14 +178,36 @@ Under pressure, **replayable evidence is preserved and non-replayable evidence i
 | Non-replayable evidence (traces, screenshots) | 30 days |
 | Raw tool stdout | 30 days |
 | Agent transcripts | 30 days |
-| Evidence metadata rows | Indefinite |
+| Sanitized evidence metadata tombstones | Indefinite |
+| Audit-trail events | Indefinite |
 
-Expiry writes a tombstone: `artifactUri` cleared, `sha256`, `sizeBytes`, `type`, and `metadata` retained. Historical findings remain explainable and their integrity claims remain checkable even after the bytes are gone.
+Every retention value is an integer from **1 through 365 days**. Organization
+administrators set organization defaults, and project administrators may set a
+nullable override for each class. Effective precedence is **project override →
+organization default → platform default**; null means inherit.
+
+Expiry is computed at capture. Shortening a policy reschedules existing live
+artifacts to the earlier deadline. Extending a policy affects new captures only:
+it never extends an existing deletion commitment and never resurrects deleted
+bytes or a tombstone.
+
+At expiry, the retention worker hard-deletes the object bytes. It treats an
+already-missing object as success so retries are idempotent, then clears
+`artifactUri` and records `objectDeletedAt` and `tombstonedAt` in a short database
+transaction. The sanitized metadata row is retained indefinitely with `sha256`,
+`fullRedactedSha256`, `sizeBytes`, `type`, safe `metadata`, and `expiresAt`.
+Historical findings remain explainable without retaining customer content. Audit
+trail records are also retained indefinitely. v1 does not provide legal holds.
+
+Retention scans use an index over `expiresAt` for rows where `tombstonedAt IS
+NULL`, bounded batches, and short transactions; the concrete future PostgreSQL
+contract is specified in [03 §5](../03-data-model/README.md#5-retention).
 
 ## 9. Access
 
 - Evidence is served through the API with project-scoped authorization, never via public bucket URLs.
 - Download links are short-lived pre-signed URLs (15 min).
+- A download or replay request for tombstoned evidence returns an RFC 9457 `410 Gone`; it never returns a URL or queues replay.
 - Every evidence access is written to the audit trail ([18 §5](../18-observability/README.md#5-audit-trail)) — evidence can contain sensitive customer data and access to it is itself auditable.
 
 ---

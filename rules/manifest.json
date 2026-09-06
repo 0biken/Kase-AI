@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "packs": [
+    {
+      "name": "kase/typescript-security",
+      "version": "1.0.0",
+      "origin": "kase-owned",
+      "license": "LicenseRef-Kase-First-Party",
+      "distribution": "bundled",
+      "rules": [
+        {
+          "id": "kase.idor.missing-ownership-predicate",
+          "source": "rules/kase/typescript-security/idor/missing-ownership-predicate.yml",
+          "provenance": "kase-correlation-spike"
+        }
+      ]
+    }
+  ]
+}

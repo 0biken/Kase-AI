@@ -42,6 +42,7 @@ export const ERROR_CODES = {
   PROJECT_SCOPE_DENIED: { status: HttpStatus.FORBIDDEN, title: 'Credential is not scoped to this project' },
   NOT_FOUND: { status: HttpStatus.NOT_FOUND, title: 'Resource not found' },
   CONFLICT: { status: HttpStatus.CONFLICT, title: 'Resource conflict' },
+  EVIDENCE_EXPIRED: { status: HttpStatus.GONE, title: 'Evidence artifact expired' },
   IDEMPOTENCY_KEY_REQUIRED: {
     status: HttpStatus.BAD_REQUEST,
     title: 'Idempotency-Key header is required',

@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { OrchestratorModule } from './orchestrator/orchestrator.module';
-import { AgentRuntimeModule } from './agent-runtime/agent-runtime.module';
 import { EvidenceModule } from './evidence/evidence.module';
 import { CorrelationModule } from './correlation/correlation.module';
 import { AssuranceModule } from './assurance/assurance.module';
@@ -14,6 +13,8 @@ import { AuthModule } from './auth/auth.module';
 import { ProjectsModule } from './projects/projects.module';
 import { TokensModule } from './tokens/tokens.module';
 import { SecretsModule } from './secrets/secrets.module';
+import { OrganizationsModule } from './organizations/organizations.module';
+import { FindingsModule } from './findings/findings.module';
 
 @Module({
   imports: [
@@ -25,13 +26,14 @@ import { SecretsModule } from './secrets/secrets.module';
     QueueModule,
     StorageModule,
     OrchestratorModule,
-    AgentRuntimeModule,
     EvidenceModule,
+    FindingsModule,
     CorrelationModule,
     AssuranceModule,
     ProjectsModule,
     TokensModule,
     SecretsModule,
+    OrganizationsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -9,6 +9,7 @@ export declare const ID_PREFIX: {
   readonly audit: 'aud';
   readonly buildProvenance: 'bp';
   readonly auditJob: 'ajob';
+  readonly auditEvent: 'aevt';
   readonly toolExecution: 'texe';
   readonly evidence: 'ev';
   readonly endpointInventory: 'einv';

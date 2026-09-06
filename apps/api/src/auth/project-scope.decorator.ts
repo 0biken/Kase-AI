@@ -2,7 +2,10 @@ import { SetMetadata } from '@nestjs/common';
 
 export const SCOPE_KEY = 'kase:scope';
 
-export type ScopeMeta = { mode: 'project'; param: string } | { mode: 'org' };
+export type ScopeMeta =
+  | { mode: 'project'; param: string }
+  | { mode: 'audit'; param: string }
+  | { mode: 'org' };
 
 /**
  * Marks a route (or a whole controller) as scoped to the project named by
@@ -16,6 +19,10 @@ export type ScopeMeta = { mode: 'project'; param: string } | { mode: 'org' };
  */
 export const ProjectScope = (param: string) =>
   SetMetadata<string, ScopeMeta>(SCOPE_KEY, { mode: 'project', param });
+
+/** Resolves project scope through a flat audit id such as /audits/:auditId. */
+export const AuditScope = (param = 'auditId') =>
+  SetMetadata<string, ScopeMeta>(SCOPE_KEY, { mode: 'audit', param });
 
 /**
  * Marks a route as intentionally organization-level rather than

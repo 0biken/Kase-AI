@@ -17,7 +17,7 @@ function ctxWithReq(principal: Principal | undefined, params: Record<string, str
 }
 
 describe('ProjectScopeGuard', () => {
-  let prisma: { projectMember: { findUnique: jest.Mock } };
+  let prisma: { projectMember: { findUnique: jest.Mock }; audit: { findUnique: jest.Mock } };
   let trail: { record: jest.Mock };
   let reflector: Reflector;
   let guard: ProjectScopeGuard;
@@ -27,7 +27,7 @@ describe('ProjectScopeGuard', () => {
   const userId = newId('user');
 
   beforeEach(() => {
-    prisma = { projectMember: { findUnique: jest.fn() } };
+    prisma = { projectMember: { findUnique: jest.fn() }, audit: { findUnique: jest.fn() } };
     trail = { record: jest.fn().mockResolvedValue(undefined) };
     reflector = new Reflector();
     guard = new ProjectScopeGuard(
@@ -89,6 +89,33 @@ describe('ProjectScopeGuard', () => {
     expect(trail.record).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'scope.denied', projectId: projectB }),
     );
+  });
+
+  it('resolves a flat audit route to its project before applying token scope', async () => {
+    const auditId = newId('audit');
+    reflector.getAllAndOverride = jest.fn().mockImplementation((key: string) =>
+      key === 'kase:scope' ? { mode: 'audit', param: 'auditId' } : undefined,
+    );
+    prisma.audit.findUnique.mockResolvedValue({ projectId: projectA });
+    const { ctx } = ctxWithReq(
+      { kind: 'token', tokenId: 't1', projectId: projectA, role: 'operator', rateClass: 'token' },
+      { auditId },
+    );
+    await expect(guard.canActivate(ctx)).resolves.toBe(true);
+    expect(prisma.audit.findUnique).toHaveBeenCalledWith({ where: { id: auditId }, select: { projectId: true } });
+  });
+
+  it('denies a flat audit route to a token from another project', async () => {
+    const auditId = newId('audit');
+    reflector.getAllAndOverride = jest.fn().mockImplementation((key: string) =>
+      key === 'kase:scope' ? { mode: 'audit', param: 'auditId' } : undefined,
+    );
+    prisma.audit.findUnique.mockResolvedValue({ projectId: projectB });
+    const { ctx } = ctxWithReq(
+      { kind: 'token', tokenId: 't1', projectId: projectA, role: 'operator', rateClass: 'token' },
+      { auditId },
+    );
+    await expect(guard.canActivate(ctx)).rejects.toMatchObject({ code: 'PROJECT_SCOPE_DENIED' });
   });
 
   // ----------------------------------------------------------------- session principal

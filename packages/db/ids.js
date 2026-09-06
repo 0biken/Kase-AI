@@ -20,6 +20,7 @@ const ID_PREFIX = {
   audit: 'aud',
   buildProvenance: 'bp',
   auditJob: 'ajob',
+  auditEvent: 'aevt',
   toolExecution: 'texe',
   evidence: 'ev',
   endpointInventory: 'einv',

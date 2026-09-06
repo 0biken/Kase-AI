@@ -1,12 +1,15 @@
-# syntax=docker/dockerfile:1.7
 FROM node:22.14.0-bookworm-slim AS builder
 WORKDIR /workspace
 RUN apt-get update \
     && apt-get install -y --no-install-recommends openssl \
     && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@10.15.0 --activate
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+COPY apps/api/package.json ./apps/api/package.json
+COPY packages/db/package.json ./packages/db/package.json
+RUN --mount=type=cache,id=kase-pnpm-store,target=/root/.local/share/pnpm/store \
+    pnpm install --filter @kase/api... --frozen-lockfile
 COPY . .
-RUN pnpm install --filter @kase/api... --frozen-lockfile
 RUN pnpm --filter @kase/db run generate && pnpm --filter @kase/api run build
 
 FROM node:22.14.0-bookworm-slim AS worker-base
@@ -37,7 +40,19 @@ FROM worker-base AS worker-browser
 ENV KASE_WORKER_FAMILY=browser
 
 FROM worker-base AS worker-sast
+USER root
+RUN sed -i 's|http://deb.debian.org|https://deb.debian.org|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends git python3 python3-venv \
+    && rm -rf /var/lib/apt/lists/*
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python3 -m venv /opt/semgrep \
+    && /opt/semgrep/bin/pip install --retries 20 --timeout 120 semgrep==1.175.0 \
+    && ln -s /opt/semgrep/bin/semgrep /usr/local/bin/semgrep \
+    && semgrep --version | grep -Fx '1.175.0'
+COPY --from=builder --chown=10001:10001 /workspace/rules ./rules
 ENV KASE_WORKER_FAMILY=sast
+USER 10001:10001
 
 FROM worker-base AS worker-deps
 ENV KASE_WORKER_FAMILY=deps

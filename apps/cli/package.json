@@ -1,0 +1,17 @@
+{
+  "name": "@kase/cli",
+  "version": "0.0.1",
+  "private": true,
+  "type": "commonjs",
+  "bin": {
+    "kase": "dist/main.js"
+  },
+  "scripts": {
+    "build": "node node_modules/typescript/bin/tsc -p tsconfig.json && node -e \"console.log('CLI_BUILD_VERIFIED')\"",
+    "test": "node node_modules/typescript/bin/tsc -p tsconfig.json && node --test dist/*.spec.js && node -e \"console.log('CLI_TESTS_VERIFIED')\""
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^5.7.3"
+  }
+}

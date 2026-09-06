@@ -1,12 +1,14 @@
 import { Module } from '@nestjs/common';
-import { BullModule } from '@nestjs/bullmq';
-import { QUEUE_RECON } from '../queue/queue.constants';
-import { OrchestratorController } from './orchestrator.controller';
+import { FlatAuditQueryController, OrchestratorController } from './orchestrator.controller';
 import { OrchestratorService } from './orchestrator.service';
+import { AuditCancellationController } from './audit-cancellation.controller';
+import { AuditCancellationService } from './audit-cancellation.service';
+import { AuditEventsModule } from '../audit-events/audit-events.module';
 
 @Module({
-  imports: [BullModule.registerQueue({ name: QUEUE_RECON })],
-  controllers: [OrchestratorController],
-  providers: [OrchestratorService],
+  imports: [AuditEventsModule],
+  controllers: [OrchestratorController, FlatAuditQueryController, AuditCancellationController],
+  providers: [OrchestratorService, AuditCancellationService],
+  exports: [OrchestratorService],
 })
 export class OrchestratorModule {}

@@ -3,7 +3,7 @@ import { OrchestratorService } from './orchestrator.service';
 describe('OrchestratorService M1 dispatch', () => {
   const actor = { type: 'token' as const, id: 'tok_1' };
   let prisma: any;
-  let queue: { add: jest.Mock };
+  let queue: { enqueue: jest.Mock; wakeScheduler: jest.Mock };
   let trail: { record: jest.Mock };
   let service: OrchestratorService;
 
@@ -28,7 +28,7 @@ describe('OrchestratorService M1 dispatch', () => {
       $transaction: jest.fn(async (value) =>
         typeof value === 'function' ? value(prisma) : Promise.all(value)),
     };
-    queue = { add: jest.fn().mockResolvedValue({ id: 'ajob_1' }) };
+    queue = { enqueue: jest.fn().mockResolvedValue(undefined), wakeScheduler: jest.fn().mockResolvedValue(undefined) };
     trail = { record: jest.fn().mockResolvedValue(undefined) };
     service = new OrchestratorService(prisma, trail as never, queue as never);
   });
@@ -40,7 +40,7 @@ describe('OrchestratorService M1 dispatch', () => {
       'request-1',
       actor,
     );
-    const payload = queue.add.mock.calls[0][1];
+    const payload = queue.enqueue.mock.calls[0][1];
     expect(Object.keys(payload).sort()).toEqual(['auditId', 'auditJobId', 'projectId']);
     expect(JSON.stringify(payload)).not.toContain('fixture');
     expect(JSON.stringify(payload).toLowerCase()).not.toContain('credential');
@@ -55,7 +55,7 @@ describe('OrchestratorService M1 dispatch', () => {
       'same-key',
       actor,
     )).resolves.toBe(existing);
-    expect(queue.add).not.toHaveBeenCalled();
+    expect(queue.enqueue).not.toHaveBeenCalled();
   });
 
   it('fails before persistence when the target host is not allowlisted', async () => {
@@ -81,5 +81,15 @@ describe('OrchestratorService M1 dispatch', () => {
       '',
       actor,
     )).rejects.toMatchObject({ code: 'IDEMPOTENCY_KEY_REQUIRED' });
+  });
+
+  it('rejects unsupported category combinations before persistence', async () => {
+    await expect(service.dispatch(
+      'prj_1',
+      { targetId: 'tgt_1', repositoryId: 'repo_1', mode: 'security', categories: ['http'] },
+      'request-3',
+      actor,
+    )).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
+    expect(prisma.audit.create).not.toHaveBeenCalled();
   });
 });

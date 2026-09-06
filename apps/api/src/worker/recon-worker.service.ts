@@ -1,8 +1,7 @@
 import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { Worker, type Job } from 'bullmq';
 import { createHash } from 'crypto';
-import { mkdir, rm, writeFile } from 'fs/promises';
-import { join } from 'path';
+import { rm } from 'fs/promises';
 import { PrismaService } from '../prisma/prisma.service';
 import { S3Service } from '../storage/s3.service';
 import { SecretsService } from '../secrets/secrets.service';
@@ -15,6 +14,11 @@ import { newId } from '../common/ids';
 import type { ReconAuditJobPayload } from '../orchestrator/audit-job.payload';
 import { CurlProbeError, runCurlProbe } from './curl-probe';
 import { SensitiveValueRedactor } from './sensitive-value-redactor';
+import { AuditJobLifecycleService } from '../orchestrator/audit-job-lifecycle.service';
+import { CancellationSignalRegistry } from '../orchestrator/cancellation-signal.registry';
+import { CancelledJobError, PermanentJobError } from '../orchestrator/retry-policy';
+import { RetentionPolicyService } from '../retention/retention-policy.service';
+import { materializeCurlConfig } from './curl-auth-config';
 
 @Injectable()
 export class ReconWorkerService implements OnModuleInit, OnApplicationShutdown {
@@ -26,6 +30,9 @@ export class ReconWorkerService implements OnModuleInit, OnApplicationShutdown {
     private readonly storage: S3Service,
     private readonly secrets: SecretsService,
     private readonly trail: AuditTrailService,
+    private readonly lifecycle: AuditJobLifecycleService,
+    private readonly cancellations: CancellationSignalRegistry,
+    private readonly retention: RetentionPolicyService,
   ) {}
 
   onModuleInit(): void {
@@ -48,47 +55,38 @@ export class ReconWorkerService implements OnModuleInit, OnApplicationShutdown {
   private async process(job: Job<ReconAuditJobPayload>, signal: AbortSignal): Promise<void> {
     assertPayload(job.data);
     const { auditId, auditJobId, projectId } = job.data;
-    const audit = await this.prisma.audit.findFirst({
-      where: { id: auditId, projectId },
-      include: { target: true },
-    });
-    if (!audit?.target) throw new Error('Audit target is missing');
-
-    const auditJob = await this.prisma.auditJob.findFirst({
-      where: { id: auditJobId, auditId, kind: 'recon' },
-    });
-    if (!auditJob) throw new Error('Audit job does not match the queue payload');
-
-    const policy = await this.prisma.scopePolicy.findFirst({
-      where: { projectId },
-      orderBy: { authorizationAttestedAt: 'desc' },
-    });
-    const targetUrl = healthUrl(audit.target.baseUrl);
-    const host = new URL(targetUrl).hostname.toLowerCase();
-    if (!policy || !isHostAllowed(host, policy.allowedHosts)) {
-      await this.recordDenial(projectId, auditId, host, 'host_not_allowed');
-      await this.failAudit(auditId, auditJobId, 'Worker scope validation denied the target');
-      throw new Error('Worker scope validation denied the target');
-    }
-
-    const proxy = process.env.KASE_EGRESS_PROXY;
-    if (!proxy) {
-      await this.failAudit(auditId, auditJobId, 'KASE_EGRESS_PROXY is required');
-      throw new Error('KASE_EGRESS_PROXY is required; direct target access is forbidden');
-    }
-
-    await this.prisma.$transaction([
-      this.prisma.audit.update({ where: { id: auditId }, data: { status: 'running' } }),
-      this.prisma.auditJob.update({
-        where: { id: auditJobId },
-        data: { status: 'running', attempts: { increment: 1 }, startedAt: new Date() },
-      }),
-    ]);
-
+    const cancellation = this.cancellations.watch(auditId, signal);
+    const effectiveSignal = cancellation.signal;
     const redactor = new SensitiveValueRedactor();
+    let heartbeat: NodeJS.Timeout | undefined;
     let configPath: string | null = null;
+    let targetUrl: string | null = null;
+    let host: string | null = null;
+    let probeStarted = false;
     const started = Date.now();
     try {
+      const claimed = await this.lifecycle.claim(job.data);
+      if (!claimed) return;
+      heartbeat = setInterval(() => void this.lifecycle.heartbeat(auditJobId), 20_000);
+      heartbeat.unref?.();
+      const audit = await this.prisma.audit.findFirst({
+        where: { id: auditId, projectId }, include: { target: true },
+      });
+      if (!audit?.target) throw new PermanentJobError('Audit target is missing');
+      const auditJob = await this.prisma.auditJob.findFirst({ where: { id: auditJobId, auditId, kind: 'recon' } });
+      if (!auditJob) throw new PermanentJobError('Audit job does not match the queue payload');
+      const policy = await this.prisma.scopePolicy.findFirst({
+        where: { projectId }, orderBy: { authorizationAttestedAt: 'desc' },
+      });
+      targetUrl = healthUrl(audit.target.baseUrl);
+      host = new URL(targetUrl).hostname.toLowerCase();
+      if (!policy || !isHostAllowed(host, policy.allowedHosts)) {
+        await this.recordDenial(projectId, auditId, host, 'host_not_allowed');
+        throw new PermanentJobError('Worker scope validation denied the target');
+      }
+      const proxy = process.env.KASE_EGRESS_PROXY;
+      if (!proxy) throw new PermanentJobError('KASE_EGRESS_PROXY is required; direct target access is forbidden');
+
       if (audit.target.authCredentialId) {
         const value = await this.secrets.resolveForWorker(projectId, audit.target.authCredentialId);
         redactor.register(value);
@@ -97,18 +95,24 @@ export class ReconWorkerService implements OnModuleInit, OnApplicationShutdown {
         throw new Error('Authenticated target has no active credential');
       }
 
-      const result = await runCurlProbe(targetUrl, proxy, configPath, signal);
+      probeStarted = true;
+      const result = await runCurlProbe(targetUrl, proxy, configPath, effectiveSignal);
       const rawArtifact = JSON.stringify({
         request: { method: 'GET', url: targetUrl },
         response: result.stdout,
       });
       const scrubbed = redactor.redact(rawArtifact);
       const content = Buffer.from(scrubbed.value, 'utf8');
+      throwIfCancelled(effectiveSignal);
       const executionId = newId('toolExecution');
       const evidenceId = newId('evidence');
       const stored = await this.storage.uploadEvidence(projectId, auditId, content);
+      throwIfCancelled(effectiveSignal);
+      const capturedAt = new Date();
+      const expiresAt = await this.retention.expiryForCapture(projectId, { type: 'http_exchange', replayable: true }, capturedAt);
 
       await this.prisma.$transaction(async (tx) => {
+        throwIfCancelled(effectiveSignal);
         await tx.toolExecution.create({
           data: {
             id: executionId,
@@ -136,31 +140,28 @@ export class ReconWorkerService implements OnModuleInit, OnApplicationShutdown {
             sha256: stored.sha256,
             sizeBytes: content.length,
             redacted: scrubbed.changed,
+            capturedAt,
+            expiresAt,
             metadata: { method: 'GET', url: targetUrl, status: responseStatus(result.stdout) },
           },
         });
-        await tx.auditJob.update({
-          where: { id: auditJobId },
-          data: { status: 'succeeded', finishedAt: new Date(), error: null },
-        });
-        await tx.audit.update({
-          where: { id: auditId },
-          data: {
-            status: 'completed',
-            completedAt: new Date(),
-            executedCategories: [auditJob.category ?? 'fixture_health'],
-          },
-        });
       });
+      await this.lifecycle.succeed(job.data);
     } catch (error) {
       const safe = redactor.redact(error instanceof Error ? error.message : 'Unknown worker error').value;
-      await this.persistFailedExecution(auditId, auditJobId, targetUrl, started, error);
-      await this.failAudit(auditId, auditJobId, safe);
-      if (error instanceof CurlProbeError && /403|access denied|forbidden/i.test(error.stderr)) {
+      if (effectiveSignal.aborted) {
+        await this.lifecycle.fail(job.data, new CancelledJobError());
+        throw new CancelledJobError();
+      }
+      if (probeStarted && targetUrl) await this.persistFailedExecution(auditId, auditJobId, targetUrl, started, error);
+      await this.lifecycle.fail(job.data, error);
+      if (host && error instanceof CurlProbeError && /403|access denied|forbidden/i.test(error.stderr)) {
         await this.recordDenial(projectId, auditId, host, 'proxy_denied');
       }
       throw new Error(safe);
     } finally {
+      if (heartbeat) clearInterval(heartbeat);
+      cancellation.close();
       redactor.clear();
       if (configPath) await rm(configPath, { force: true });
     }
@@ -190,19 +191,6 @@ export class ReconWorkerService implements OnModuleInit, OnApplicationShutdown {
     }).catch(() => undefined);
   }
 
-  private async failAudit(auditId: string, auditJobId: string, error: string): Promise<void> {
-    await this.prisma.$transaction([
-      this.prisma.auditJob.update({
-        where: { id: auditJobId },
-        data: { status: 'failed', error: error.slice(0, 1000), finishedAt: new Date() },
-      }),
-      this.prisma.audit.update({
-        where: { id: auditId },
-        data: { status: 'failed', completedAt: new Date() },
-      }),
-    ]);
-  }
-
   private recordDenial(projectId: string, auditId: string, host: string, reason: string) {
     return this.trail.record({
       projectId,
@@ -216,6 +204,10 @@ export class ReconWorkerService implements OnModuleInit, OnApplicationShutdown {
   }
 }
 
+function throwIfCancelled(signal: AbortSignal): void {
+  if (signal.aborted) throw new CancelledJobError();
+}
+
 function assertPayload(payload: ReconAuditJobPayload): void {
   const keys = Object.keys(payload).sort();
   const expected = ['auditId', 'auditJobId', 'projectId'];
@@ -226,19 +218,6 @@ function assertPayload(payload: ReconAuditJobPayload): void {
 
 function healthUrl(baseUrl: string): string {
   return new URL('healthz', `${baseUrl.replace(/\/+$/, '')}/`).toString();
-}
-
-async function materializeCurlConfig(jobId: string, authMode: string, value: string): Promise<string> {
-  const root = process.env.KASE_SECRET_TMPFS ?? '/run/kase-secrets';
-  await mkdir(root, { recursive: true, mode: 0o700 });
-  const path = join(root, `${jobId}.curl-config`);
-  const escaped = value.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/[\r\n]/g, '');
-  let line: string;
-  if (authMode === 'header') line = `header = "${escaped}"\n`;
-  else if (authMode === 'cookie') line = `cookie = "${escaped}"\n`;
-  else throw new Error(`M1 worker does not support auth mode "${authMode}"`);
-  await writeFile(path, line, { encoding: 'utf8', mode: 0o600 });
-  return path;
 }
 
 function responseStatus(raw: string): number | null {

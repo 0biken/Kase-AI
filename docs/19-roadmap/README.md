@@ -82,6 +82,8 @@ M1 is complete. The static gate and live Docker Compose proof pass: migrations a
 - `http` and `semgrep` adapters
 - CLI: `audit start`, `findings list`
 
+M2 is complete. The static recovery suite and retained live Compose proof pass: a Semgrep-only audit checks out the exact commit, emits the normalized `kase.idor.missing-ownership-predicate` finding with authoritative `high` severity and replayable evidence, independently verifies the MinIO SHA-256, resumes after a forced SAST-worker interruption without duplicate records, terminates a held subprocess through the cancellation API, and hard-deletes expired object bytes while retaining a metadata-only `410 Gone` tombstone. The no-AI guard confirms that no agent or model-provider workload participates.
+
 **Exit:** a semgrep-only audit produces normalized, severity-assigned findings with evidence. No AI involved yet.
 
 ### M3 — Recon and inventory (weeks 7–8)
@@ -166,11 +168,11 @@ Request-ID instrumented correlation mode · Express and Django route parsing · 
 
 | Item | Owner | Blocks |
 |---|---|---|
-| **Semgrep ruleset licensing review** | Legal | M2 — swapping SAST engines later is expensive ([02 §3](../02-stack/README.md#3-open-item-semgrep-licensing)) |
+| ~~Semgrep ruleset licensing review~~ | Product/Legal | Closed — LGPL engine with notices; Kase-owned rules plus tenant-scoped customer packs; no Semgrep Registry rules ([ADR-015](../20-adr/README.md#adr-015--ship-kase-rules-never-semgrep-registry-rules)) |
 | ~~Secrets management implementation choice~~ | Eng | Closed — portable provider interface; local KEK for development, cloud KMS binding deferred |
 | ~~Naming: directory `Kase` vs. product name in PRD~~ — **closed.** Product is Kase throughout; CLI namespace is `kase` | Product | — |
 | LLM provider contract and rate limits | Eng | M4 |
-| Evidence retention policy vs. customer requirements | Product | M2 |
+| ~~Evidence retention policy vs. customer requirements~~ | Product | Closed — 90/30/30/30 defaults, 1–365 day organization/project policy, mandatory capture-time redaction, metadata tombstones ([ADR-016](../20-adr/README.md#adr-016--bounded-retention-and-mandatory-capture-time-redaction)) |
 
 ## 7. Risk register
 

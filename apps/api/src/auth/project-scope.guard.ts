@@ -66,7 +66,29 @@ export class ProjectScopeGuard implements CanActivate {
     if (meta.mode === 'org') {
       return this.checkOrgScope(principal, req);
     }
+    if (meta.mode === 'audit') {
+      return this.checkAuditScope(meta.param, principal, req);
+    }
     return this.checkProjectScope(meta.param, principal, req);
+  }
+
+  private async checkAuditScope(
+    param: string,
+    principal: NonNullable<Request['principal']>,
+    req: Request,
+  ): Promise<boolean> {
+    const raw = req.params[param];
+    const auditId = Array.isArray(raw) ? raw[0] : raw;
+    if (!isId('audit', auditId)) {
+      throw new ProblemException('NOT_FOUND', `"${String(auditId)}" is not a valid audit id`);
+    }
+    const audit = await this.prisma.audit.findUnique({
+      where: { id: auditId },
+      select: { projectId: true },
+    });
+    if (!audit) throw new ProblemException('NOT_FOUND', 'Audit does not exist');
+    req.params.__resolvedProjectId = audit.projectId;
+    return this.authorizeProject(audit.projectId, principal, req);
   }
 
   private checkOrgScope(principal: Request['principal'], req: Request): boolean {
@@ -88,11 +110,20 @@ export class ProjectScopeGuard implements CanActivate {
     principal: NonNullable<Request['principal']>,
     req: Request,
   ): Promise<boolean> {
-    const projectId = req.params[param];
+    const raw = req.params[param];
+    const projectId = Array.isArray(raw) ? raw[0] : raw;
     if (!isId('project', projectId)) {
       throw new ProblemException('NOT_FOUND', `"${String(projectId)}" is not a valid project id`);
     }
 
+    return this.authorizeProject(projectId, principal, req);
+  }
+
+  private async authorizeProject(
+    projectId: string,
+    principal: NonNullable<Request['principal']>,
+    req: Request,
+  ): Promise<boolean> {
     if (principal.kind === 'token') {
       if (principal.projectId !== projectId) {
         await this.denyScope(req, projectId, 'token is scoped to a different project');

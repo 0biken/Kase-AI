@@ -4,28 +4,28 @@ Executable form of [19 — Roadmap](docs/19-roadmap/README.md). Ordered by depen
 
 **Legend:** `[x]` done · `[~]` partially done · `[ ]` not started · **⚠** blocks other work
 
-**130 tasks, 21 done.** Counts include milestone exit criteria, which are the real gates.
+**130 tasks, 48 done.** Counts include milestone exit criteria, which are the real gates.
 
 | | Phase 0 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | Invariants |
 |---|---|---|---|---|---|---|---|---|---|
-| Done | 5 | 16 | 0 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Done | 14 | 16 | 18 | 0 | 0 | 0 | 0 | 0 | 0 |
 | Total | 15 | 16 | 18 | 9 | 15 | 14 | 16 | 19 | 8 |
 
 ---
 
 ## Phase 0 — Decisions and de-risking
 
-Non-code work that blocks code. Start the legal item this week; it has the longest lead time.
+Non-code work that blocks code. Only the M4 LLM provider contract remains open.
 
-- [ ] **⚠ Semgrep ruleset licensing review** — [02 §3](docs/02-stack/README.md#3-open-item-semgrep-licensing)
-  - [ ] Enumerate the exact rulesets Kase intends to ship
-  - [ ] Legal opinion on redistribution in a commercial product
-  - [ ] Decide: first-party rules · permissive community rules · customer-supplied entitlement
-  - [ ] Confirm the SAST adapter stays engine-agnostic regardless of outcome
-- [ ] **⚠ Evidence retention policy** — blocks M2 storage design
-  - [ ] Default retention window per evidence type (traces and screenshots are the expensive ones)
-  - [ ] PII position: what may be captured, what must be redacted at capture
-  - [ ] Customer-configurable override, and whether deletion is hard or soft
+- [x] **Semgrep ruleset licensing review** — [ADR-015](docs/20-adr/README.md#adr-015--ship-kase-rules-never-semgrep-registry-rules)
+  - [x] Enumerate the exact rulesets Kase intends to ship
+  - [x] Record the commercial redistribution decision from published upstream terms without claiming external legal advice
+  - [x] Decide: first-party Kase rules plus tenant-scoped customer-supplied packs; no Semgrep Registry rules
+  - [x] Confirm the SAST adapter stays engine-agnostic regardless of outcome
+- [x] **Evidence retention policy** — [ADR-016](docs/20-adr/README.md#adr-016--bounded-retention-and-mandatory-capture-time-redaction)
+  - [x] Default retention window per evidence type (traces and screenshots are the expensive ones)
+  - [x] PII position: mandatory capture-time baseline; unsafe binary evidence is dropped and degrades the audit
+  - [x] Organization defaults plus project overrides; hard-delete bytes and retain a safe metadata tombstone
 - [ ] **LLM provider contract and rate limits** — blocks M4 budget design
 - [x] **Secrets management** — portable `KeyEncryptionProvider`, local development KEK, production cloud KMS seam; envelope encryption confirmed
 - [x] **Correlation spike** — [`spike/correlation/`](spike/correlation/README.md), 11/11 passing
@@ -70,32 +70,32 @@ Non-code work that blocks code. Start the legal item this week; it has the longe
 **Goal:** a Semgrep-only audit produces normalized, severity-assigned findings with evidence. **No AI involved yet.**
 
 ### Orchestration
-- [ ] Audit state machine — `queued → running → completed | partial | failed | cancelled` ([04](docs/04-orchestrator/README.md))
-- [ ] Job graph with `dependsOn`, retries (max 2), per-adapter timeouts
-- [ ] Resumability and partial-result preservation
-- [ ] `degraded` flag and `degradationReasons` plumbed onto Audit
-- [ ] Cancellation that actually stops workers
+- [x] Audit state machine — `queued → running → completed | partial | failed | cancelled` ([04](docs/04-orchestrator/README.md))
+- [x] Job graph with `dependsOn`, retries (max 2), per-adapter timeouts
+- [x] Resumability and partial-result preservation
+- [x] `degraded` flag and `degradationReasons` plumbed onto Audit
+- [x] Cancellation that actually stops workers
 
 ### Build provenance ⚠
-- [ ] Resolution from all four sources: `ci_supplied`, `build_info_endpoint`, `response_header`, `assumed`
-- [ ] Mismatch between CI SHA and target-reported SHA → refuse to verify
-- [ ] `verified: false` propagates to every correlation in the audit
+- [x] Resolution from all four sources: `ci_supplied`, `build_info_endpoint`, `response_header`, `assumed`
+- [x] Mismatch between CI SHA and target-reported SHA → refuse to verify
+- [x] `verified: false` propagates to every correlation in the audit
 
 ### Evidence store
-- [ ] Content addressing, SHA-256 on write, immutability enforced
-- [ ] Capture-time redaction with a registered-secret redactor ([08 §5](docs/08-evidence/README.md#5-redaction))
-- [ ] Size caps and truncation with full-content hashing ([08 §6](docs/08-evidence/README.md#6-size-limits-and-truncation))
-- [ ] `replayable` classification set at capture, not inferred later
+- [x] Content addressing, SHA-256 on write, immutability enforced
+- [x] Capture-time redaction with a registered-secret redactor ([08 §5](docs/08-evidence/README.md#5-redaction))
+- [x] Size caps and truncation with full-content hashing ([08 §6](docs/08-evidence/README.md#6-size-limits-and-truncation))
+- [x] `replayable` classification set at capture, not inferred later
 
 ### Findings
-- [ ] `NormalizedFinding` shape and the normalizer
-- [ ] Severity engine with category floors — adapters never set severity
-- [ ] `http` adapter (replayable exchanges)
-- [ ] `semgrep` adapter with enclosing-symbol resolution from the AST
-- [ ] CLI: `kase audit start`, `kase findings list`
+- [x] `NormalizedFinding` shape and the normalizer
+- [x] Severity engine with category floors — adapters never set severity
+- [x] `http` adapter (replayable exchanges)
+- [x] `semgrep` adapter with enclosing-symbol resolution from the AST
+- [x] CLI: `kase audit start`, `kase findings list`
 
 **Exit criteria**
-- [ ] A Semgrep-only audit against the fixture produces normalized findings with authoritative severity and replayable evidence, with zero AI calls
+- [x] A Semgrep-only audit against the fixture produces normalized findings with authoritative severity and replayable evidence, with zero AI calls
 
 ---
 

@@ -79,7 +79,9 @@ One correlated finding, both evidence artifacts preserved, gate blocks the build
 
 ## Delivery
 
-[TASKS.md](TASKS.md) is the executable checklist — 130 tasks across Phase 0 and M1–M7, with milestone exit criteria as the real gates. Start with Phase 0; the Semgrep licensing review has the longest lead time and blocks M2.
+[**Current verified progress: 48/130 tasks complete**](TASKS.md) — Phase 0 is 14/15, M1 is 16/16, and M2 is 18/18. The retained-stack M2 acceptance evidence, including worker recovery, cancellation, MinIO hash verification, and retention tombstoning, is recorded in [`GATES-M2-LIVE.md`](GATES-M2-LIVE.md).
+
+[TASKS.md](TASKS.md) is the executable checklist — 130 tasks across Phase 0 and M1–M7, with milestone exit criteria as the real gates. The Semgrep licensing and evidence-policy decisions are closed; the LLM provider contract is the only remaining Phase 0 item and does not block M2.
 
 For substantial engineering work, [`quality-gates/`](quality-gates/README.md) provides executable completion ledgers backed by a project-local, commit-pinned copy of Unlazy. This verifies development claims only; it is deliberately separate from Kase's product policy engine and never runs in audit workers.
 
@@ -122,4 +124,4 @@ Their `references/` payloads (`test-categories.md`, `whitebox-categories.md`, `f
 
 ## Status
 
-M1 is implemented and verified by both static checks and a live Docker Compose proof. The retained stack demonstrates live PostgreSQL migrations, API audit dispatch, correctly hashed MinIO evidence, fail-closed denied egress, and a non-root agent worker isolated from the target. M2 — the deterministic audit spine — is next; see [19 — Roadmap](docs/19-roadmap/README.md#3-milestones).
+M1 and M2 are implemented and verified by static checks and live Docker Compose proofs. The retained M2 stack demonstrates a Semgrep-only audit with exact build provenance, normalized authoritative-severity findings, independently hash-verified MinIO evidence, duplicate-free worker-crash recovery, real subprocess cancellation, and hard object deletion with metadata-only `410 Gone` tombstones. No AI workload participates in M2. See [19 — Roadmap](docs/19-roadmap/README.md#3-milestones).

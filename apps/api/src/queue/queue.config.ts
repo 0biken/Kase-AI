@@ -29,6 +29,15 @@ function envInt(name: string, fallback: number): number {
 
 const MINUTE = 60_000;
 
+/**
+ * The default must outlive the longest declared adapter budget (30 minutes)
+ * plus renewal headroom. Proof environments may explicitly shorten it to
+ * exercise lease recovery; production defaults must never make a healthy
+ * long-running job look stalled and execute twice.
+ */
+export const BULL_LOCK_DURATION_MS = envInt('BULL_LOCK_DURATION_MS', 31 * MINUTE);
+export const BULL_STALLED_INTERVAL_MS = envInt('BULL_STALLED_INTERVAL_MS', 15_000);
+
 /** 02 §7: "Concurrent audits per instance | 2 | Browser workers are memory-hungry" */
 export const MAX_CONCURRENT_AUDITS = envInt('MAX_CONCURRENT_AUDITS', 2);
 
@@ -108,11 +117,12 @@ export function redisConnection() {
  * The +1 min is renewal headroom.
  */
 export function workerOptionsFor(queue: QueueName) {
-  const { concurrency, timeoutMs } = limitsFor(queue);
+  const { concurrency } = limitsFor(queue);
   return {
     connection: redisConnection(),
     concurrency,
-    lockDuration: timeoutMs + MINUTE,
+    lockDuration: BULL_LOCK_DURATION_MS,
+    stalledInterval: BULL_STALLED_INTERVAL_MS,
     maxStalledCount: 1,
   };
 }

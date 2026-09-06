@@ -150,9 +150,47 @@ Deterministic and versioned, which makes its output gate-eligible. Template tags
 | Runtime | Python, pinned; ruleset version recorded |
 | Evidence | `sast_json` (**replayable** — rule + file + symbol) |
 | Egress | **None** (offline rule bundle) |
-| Open item | Ruleset licensing — see [02 §3](../02-stack/README.md#3-open-item-semgrep-licensing) |
+| Built-in pack | `kase/typescript-security@1.0.0` (Kase-owned) |
 
-Normalizes to `ruleId: semgrep.<rule-id>`, `cwe` from rule metadata, and a `SourceLocation` carrying the enclosing symbol resolved from the AST — not just the line.
+Kase bundles the LGPL-2.1 Semgrep Community Edition engine with its required notices and source attribution, but does not distribute or serve Semgrep Registry, Community Edition-pack, or Pro rules. The built-in inventory is closed: [`rules/manifest.json`](../../rules/manifest.json) contains only `kase/typescript-security@1.0.0` and its initial `kase.idor.missing-ownership-predicate` rule. Registry aliases and remote rule URLs are invalid inputs.
+
+Customer rule packs are tenant-scoped YAML uploads. The upload boundary records this contract before accepting bytes:
+
+```yaml
+tenantId: org_01HZX7PX7M8YVZ6G4H31T51J2P
+name: acme/typescript-security
+version: 2026.09.0
+sha256: 76b4cbbad665ae678dff5239cf67f8d79d7a71f1016d020c7f115d31aa2c426f
+source:
+  kind: customer-upload
+  fileName: acme-typescript-security.yml
+license:
+  label: LicenseRef-Acme-Internal
+  attestedByActorId: usr_01HZX7Q6M3MMWQPFW9Q6EBAA9T
+  attestedAt: 2026-09-01T10:30:00.000Z
+```
+
+`sha256` is immutable after upload and covers the exact uploaded YAML bytes. `tenantId`, `name`, and `version` form the tenant-local identity; packs are never shared across tenants. The same digest may be uploaded by another tenant only as a separate record with that tenant's own provenance and license attestation. `source.kind` must be `customer-upload`; URLs, registry aliases, cross-tenant references, and server-side registry fetches are rejected. The license label and actor/time attestation state that the customer is responsible for its right to use the pack; Kase records but does not adjudicate that claim.
+
+Before dispatch, either an approved built-in pack or an accepted customer upload resolves to an immutable, worker-local reference. `run_sast` is engine-neutral and receives no registry coordinate or engine command:
+
+```ts
+interface ResolvedRulePackRef {
+  tenantId: string
+  name: string
+  version: string
+  sha256: string
+  localUri: string       // worker-local, immutable content-addressed object
+  provenance: 'kase-built-in' | 'customer-upload'
+}
+
+interface RunSastInput {
+  paths: string[]
+  rulePack: ResolvedRulePackRef
+}
+```
+
+The adapter verifies the local bytes against `sha256`, invokes the pinned engine offline, and emits the common `NormalizedFinding` shape. It normalizes the pack-declared stable rule ID directly (for example `kase.idor.missing-ownership-predicate`), `cwe` from rule metadata, and a `SourceLocation` carrying the enclosing symbol resolved from the AST—not just the line. Downstream findings, fingerprints, policies, and gates never receive `semgrep.*` namespaces, Semgrep registry coordinates, raw engine commands, or engine-specific result shapes. This preserves the adapter boundary if Kase replaces the engine later.
 
 ### 4.9 `gitleaks` — secret scanning
 

@@ -20,6 +20,8 @@ The decisions that changed the design, and why. Each records what was rejected a
 | [012](#adr-012--typescript-orchestrator-polyglot-tool-layer) | TypeScript orchestrator, polyglot tool layer | Accepted |
 | [013](#adr-013--rs256-sessions-sha-256-tokens-flat-roles-invite-only) | RS256 sessions, SHA-256 tokens, flat roles, invite-only | Accepted |
 | [014](#adr-014--k6-in-v1-behind-explicit-authorization) | k6 in v1, behind explicit authorization | Accepted |
+| [015](#adr-015--ship-kase-rules-never-semgrep-registry-rules) | Ship Kase rules, never Semgrep Registry rules | Accepted |
+| [016](#adr-016--bounded-retention-and-mandatory-capture-time-redaction) | Bounded retention and mandatory capture-time redaction | Accepted |
 
 ---
 
@@ -216,6 +218,36 @@ The first ground — rarely gate-blocking — is answered by not letting it bloc
 This leaves `lighthouse` ([07 §4.6](../07-tool-adapters/README.md)) as the remaining adapter whose entry still reads "advisory unless the project explicitly opts in with a fixed budget" — phrasing that implies a blocking path §3 does not actually allow. Same conflation, pre-dating this ADR; flagged here rather than silently changed, since narrowing an existing adapter's semantics is its own decision.
 
 Production load testing now has two independent authorizations — `destructiveAllowed` and a target-specific attestation — which is deliberate friction. A load test against production that nobody explicitly authorized is the incident this ADR is accountable for preventing.
+
+---
+
+## ADR-015 — Ship Kase rules, never Semgrep Registry rules
+
+**Context.** Kase is a commercial hosted product. The [Semgrep engine](https://github.com/semgrep/semgrep) and its rule catalog have different licenses: the engine is LGPL-2.1, while the [Semgrep Rules License](https://semgrep.dev/legal/rules-license/) permits internal business use but prohibits distributing the rules or making them available as a service. Treating a public registry alias as a free redistributable dependency would put M2 on a contract Kase is not allowed to serve.
+
+**Decision.** Kase may bundle a pinned Semgrep Community Edition engine with its LGPL notice, attribution, corresponding-source link, and any required modification notices. Kase never ships, mirrors, caches, fetches, or serves Semgrep Registry Community or Pro rules. The only built-in v1 pack is `kase/typescript-security@1.0.0`, owned by Kase, initially containing `kase.idor.missing-ownership-predicate` from the correlation spike. Registry aliases, `auto`, remote rule URLs, and Semgrep-authored packs are invalid built-in configuration.
+
+Customers may upload rule YAML they are entitled to use. A customer pack is tenant-scoped and immutable by SHA-256; its record carries name, version, source, license label, attesting actor, and attestation time. Kase records the assertion but does not adjudicate it, never shares the pack across tenants, and resolves it to a local file before execution. The SAST adapter accepts a resolved pack reference and emits Kase-normalized findings so downstream identities and policies do not depend on Semgrep's registry namespace.
+
+**Rejected.** Bundling Community Edition or Pro registry packs; invoking registry aliases at runtime; making a Semgrep commercial agreement a prerequisite for M2; and shipping the engine with no default rules. The first two conflict with the published rule terms, the third creates an avoidable external blocker, and the fourth makes the M2 fixture exit criterion unusable out of the box.
+
+**Consequence.** Kase owns the quality, licensing, versioning, and regression tests for every built-in rule. New built-in packs require inventory and license review. This is a product architecture decision based on published upstream terms, not a substitute for external legal advice.
+
+---
+
+## ADR-016 — Bounded retention and mandatory capture-time redaction
+
+**Context.** Evidence must remain defensible without becoming an indefinite copy of customer secrets and personal data. Existing documents disagreed on whether all artifacts lived for 90 days, and they did not define override precedence, retroactive policy changes, or what happens when a binary artifact cannot be safely scrubbed.
+
+**Decision.** Platform defaults are 90 days for replayable evidence and 30 days each for non-replayable evidence, raw tool output, and agent transcripts. Safe metadata tombstones and audit-trail records are retained indefinitely. Organizations set defaults and projects may override each class with a value from 1 through 365 days; precedence is project, then organization, then platform. Expiry is fixed at capture. Shortening a policy may only move existing expiry earlier; extending a policy affects new captures and never revives or extends an existing deletion commitment. v1 has no legal hold.
+
+Redaction is mandatory, happens in the worker before truncation, hashing, or upload, and cannot be weakened by customer policy. Registered secrets and sensitive headers or cookies are removed; common credential and PII patterns are replaced, with stable per-audit pseudonyms for ordinary PII so equality remains useful. Customer patterns add to the baseline. Secret-scanner matches never store the matched value. `Evidence.sha256` hashes the stored redacted bytes; truncated artifacts additionally record the SHA-256 of the complete redacted payload. If a screenshot, trace, or other binary artifact cannot be proven safe, Kase drops it, records `evidence.capture_rejected`, and degrades the audit.
+
+At expiry the retention worker hard-deletes object bytes, then clears `artifactUri` and retains the already-redacted hash, size, type, safe metadata, expiry, and tombstone timestamps. Download and replay return RFC 9457 `410 Gone`. The future PostgreSQL design uses 1–365 check constraints, timezone-aware timestamps, a partial index for untombstoned expiry candidates, bounded batches, short transactions, and idempotent object deletion so retries are safe.
+
+**Rejected.** Indefinite artifact retention; one fixed platform window; customer ability to disable baseline redaction; extending existing deletion commitments after a policy increase; post-hoc redaction; and storing unsanitized binary evidence behind stricter authorization. Each either breaks an explicit deletion promise or stores sensitive bytes before Kase has made them safe.
+
+**Consequence.** M2 has one authoritative privacy and lifecycle contract. Replayable evidence gets the longest useful window, customers can minimize or extend within a bounded range, and historical findings remain explainable without retaining the original object forever.
 
 ---
 

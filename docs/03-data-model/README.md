@@ -61,6 +61,10 @@ Two entities deserve attention because they are easy to get wrong:
 }
 ```
 
+Evidence-retention settings are deliberately not embedded in `Project`. M2 adds
+one organization policy and an optional project override, described in §5, so a
+project can inherit future organization changes without copying default values.
+
 ### Repository
 
 ```ts
@@ -263,7 +267,8 @@ ToolExecution {
 
 ### Evidence
 
-Immutable. See [08](../08-evidence/README.md).
+Immutable while object bytes exist; expiry tombstones the row without rewriting
+the recorded integrity facts. See [08](../08-evidence/README.md).
 
 ```ts
 {
@@ -275,12 +280,17 @@ Immutable. See [08](../08-evidence/README.md).
       | 'lighthouse_json' | 'axe_json' | 'sast_json' | 'dependency_json'
       | 'source_excerpt' | 'git_metadata' | 'crawl_result' | 'test_output'
   replayable: boolean           // gate-relevant, see §3
-  artifactUri: string           // s3://...
-  sha256: string
+  artifactUri: string | null    // cleared only after retention hard-deletes the object
+  sha256: string                // SHA-256 of the stored (possibly truncated) redacted bytes
+  fullRedactedSha256: string | null // full redacted stream when truncated; otherwise null
   sizeBytes: number
+  truncated: boolean
   redacted: boolean
   capturedAt: DateTime
-  metadata: Json
+  expiresAt: DateTime
+  objectDeletedAt: DateTime | null
+  tombstonedAt: DateTime | null
+  metadata: Json                // sanitized, safe to retain indefinitely
 }
 ```
 
@@ -505,6 +515,7 @@ Deliberately no `confidence >= 0.90` term. An LLM-emitted probability is not cal
 | `FindingEvidence` | `(evidenceId)` | Reverse lookup: which findings cite this evidence |
 | `Correlation` | `(blackboxFindingId)`, `(whiteboxFindingId)` | Gate eligibility resolves correlation per finding — [09 §8](../09-findings/README.md#8-gate-eligibility) |
 | `Evidence` | `(auditId, type)` | Report assembly |
+| `Evidence` | `(expiresAt) WHERE tombstonedAt IS NULL` | Bounded retention scans only inspect live expiry candidates |
 | `Endpoint` | `(inventoryId, method, pathTemplate)` unique | Inventory merge |
 | `ToolExecution` | `(auditJobId)` | Job drill-down |
 | `Waiver` | `(projectId, fingerprint, expiresAt)` | Gate evaluation and expiry warnings |
@@ -516,11 +527,53 @@ The two correlation indexes are not optional. Gate evaluation resolves a correla
 | Data | Default retention |
 |---|---|
 | Findings, identities, gate evaluations | Indefinite |
-| Evidence artifacts | 90 days, then metadata-only tombstone |
+| Replayable evidence | 90 days |
+| Non-replayable evidence | 30 days |
 | Raw tool stdout | 30 days |
 | Agent transcripts | 30 days |
+| Sanitized evidence tombstones and audit-trail events | Indefinite |
 
-Tombstoned evidence keeps `sha256` and `metadata` so historical findings remain auditable even after the artifact is expired.
+### M2 policy records
+
+M2 adds an organization policy and a nullable project override. Each of the
+four values is an integer number of days with a PostgreSQL `CHECK` constraint of
+`1 <= value AND value <= 365`.
+
+```ts
+EvidenceRetentionPolicy {
+  organizationId: string
+  replayableEvidenceDays: number       // platform default 90
+  nonReplayableEvidenceDays: number    // platform default 30
+  rawToolOutputDays: number             // platform default 30
+  agentTranscriptDays: number           // platform default 30
+  updatedBy: string
+  updatedAt: DateTime
+}
+
+ProjectEvidenceRetentionOverride {
+  projectId: string
+  replayableEvidenceDays: number | null
+  nonReplayableEvidenceDays: number | null
+  rawToolOutputDays: number | null
+  agentTranscriptDays: number | null
+  updatedBy: string
+  updatedAt: DateTime
+}
+```
+
+The effective value for each field is resolved independently as **project
+override → organization default → platform default**. `expiresAt` is fixed when
+an artifact is captured. A shorter effective policy updates existing live rows
+to the earlier date; a longer policy applies only to new captures and must not
+extend an existing deletion commitment or resurrect a tombstone.
+
+The retention worker uses the partial expiry index above, bounded batches, and
+short database transactions. For each candidate it hard-deletes object bytes;
+an already-absent object counts as successful idempotent deletion. Only then
+does it atomically clear `artifactUri` and set `objectDeletedAt` and
+`tombstonedAt`. The row retains `sha256`, `fullRedactedSha256`, `sizeBytes`,
+`type`, sanitized `metadata`, and `expiresAt` indefinitely. v1 has no legal-hold
+mechanism.
 
 ---
 

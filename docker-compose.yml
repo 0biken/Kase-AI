@@ -204,6 +204,133 @@ services:
           cpus: "1.0"
           memory: 512m
 
+  scheduler:
+    build:
+      context: .
+      dockerfile: workers/Dockerfile
+      target: worker-base
+    command: ["node", "apps/api/dist/scheduler-main.js"]
+    user: "10001:10001"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    environment:
+      DATABASE_URL: postgresql://kase:password@postgres:5432/kase?schema=public
+      KASE_REDIS_HOST: redis
+      KASE_REDIS_PORT: 6379
+      KASE_JOB_LEASE_MS: ${KASE_JOB_LEASE_MS:-60000}
+      KASE_SCHEDULER_RECOVERY_MS: ${KASE_SCHEDULER_RECOVERY_MS:-30000}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+    networks:
+      - kase-core
+
+  sast-checkout-init:
+    build:
+      context: .
+      dockerfile: workers/Dockerfile
+      target: worker-sast
+    command: ["sh", "-c", "chown 10001:10001 /workspace/.kase-checkouts && chmod 0700 /workspace/.kase-checkouts"]
+    user: "0:0"
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - sast-checkouts:/workspace/.kase-checkouts
+    network_mode: none
+
+  worker-sast:
+    build:
+      context: .
+      dockerfile: workers/Dockerfile
+      target: worker-sast
+    command: ["node", "apps/api/dist/sast-worker-main.js"]
+    user: "10001:10001"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=./infra/seccomp/worker.json
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    volumes:
+      - sast-checkouts:/workspace/.kase-checkouts
+      - ./.m2-proof/repository:/proof-repository:ro
+      - ./rules:/workspace/rules:ro
+      - ./workers/sast-proof.gitconfig:/etc/gitconfig:ro
+    environment:
+      DATABASE_URL: postgresql://kase:password@postgres:5432/kase?schema=public
+      KASE_REDIS_HOST: redis
+      KASE_REDIS_PORT: 6379
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: kase-evidence
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      HOME: /tmp
+      KASE_ALLOW_LOCAL_REPOSITORIES: "true"
+      KASE_CHECKOUT_ROOT: /workspace/.kase-checkouts
+      KASE_SAST_RULE_PACK: /workspace/rules/kase/typescript-security/idor/missing-ownership-predicate.yml
+      KASE_SAST_RULE_PACK_SHA256: ${KASE_SAST_RULE_PACK_SHA256:-}
+      KASE_SAST_IMAGE_DIGEST: kase/worker-sast:dev
+      KASE_JOB_LEASE_MS: ${KASE_JOB_LEASE_MS:-60000}
+      KASE_JOB_HEARTBEAT_MS: ${KASE_JOB_HEARTBEAT_MS:-20000}
+      KASE_BULL_LOCK_DURATION_MS: ${KASE_BULL_LOCK_DURATION_MS:-60000}
+      KASE_BULL_STALLED_INTERVAL_MS: ${KASE_BULL_STALLED_INTERVAL_MS:-15000}
+      KASE_ENABLE_PROOF_HOOKS: ${KASE_ENABLE_PROOF_HOOKS:-false}
+      KASE_SEMGREP_PROOF_HOLD_MS: ${KASE_SEMGREP_PROOF_HOLD_MS:-1}
+    depends_on:
+      sast-checkout-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    networks:
+      - kase-core
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1536m
+
+  worker-retention:
+    build:
+      context: .
+      dockerfile: workers/Dockerfile
+      target: worker-base
+    command: ["node", "apps/api/dist/retention-worker-main.js"]
+    user: "10001:10001"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    environment:
+      DATABASE_URL: postgresql://kase:password@postgres:5432/kase?schema=public
+      S3_ENDPOINT: http://minio:9000
+      S3_RETENTION_ACCESS_KEY: minioadmin
+      S3_RETENTION_SECRET_KEY: minioadmin
+      KASE_RETENTION_INTERVAL_MS: ${KASE_RETENTION_INTERVAL_MS:-60000}
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    networks:
+      - kase-core
+
   worker-agent-check:
     build:
       context: .
@@ -234,6 +361,7 @@ volumes:
   postgres-data:
   redis-data:
   minio-data:
+  sast-checkouts:
 
 networks:
   kase-core:

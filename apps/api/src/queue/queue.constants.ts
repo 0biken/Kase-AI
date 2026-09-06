@@ -15,6 +15,10 @@ export const QUEUE_WHITEBOX_AGENT = 'whitebox-agent';
 export const QUEUE_TOOL = 'tool';
 export const QUEUE_CORRELATE = 'correlate';
 export const QUEUE_REPORT = 'report';
+export const QUEUE_PROVENANCE = 'build-provenance';
+export const QUEUE_SEMGREP = 'semgrep';
+export const QUEUE_HTTP = 'http';
+export const QUEUE_NORMALIZE_SEVERITY = 'normalize-severity';
 
 export const JOB_QUEUES = [
   QUEUE_RECON,
@@ -23,6 +27,10 @@ export const JOB_QUEUES = [
   QUEUE_TOOL,
   QUEUE_CORRELATE,
   QUEUE_REPORT,
+  QUEUE_PROVENANCE,
+  QUEUE_SEMGREP,
+  QUEUE_HTTP,
+  QUEUE_NORMALIZE_SEVERITY,
 ] as const;
 
 export const ALL_QUEUES = [QUEUE_AUDIT, ...JOB_QUEUES] as const;
@@ -37,4 +45,8 @@ export const QUEUE_BY_JOB_KIND: Record<string, QueueName> = {
   tool: QUEUE_TOOL,
   correlate: QUEUE_CORRELATE,
   report: QUEUE_REPORT,
+  build_provenance: QUEUE_PROVENANCE,
+  semgrep: QUEUE_SEMGREP,
+  http: QUEUE_HTTP,
+  normalize_severity: QUEUE_NORMALIZE_SEVERITY,
 };

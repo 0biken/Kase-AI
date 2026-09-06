@@ -1,0 +1,24 @@
+rules:
+  - id: kase.idor.missing-ownership-predicate
+    languages: [typescript]
+    severity: WARNING
+    message: Object lookup uses a caller-controlled identifier without an ownership predicate.
+    metadata:
+      cwe: CWE-639
+      category: authorization
+      confidence: HIGH
+      provenance: kase-correlation-spike
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $REPO.findOne({ where: { id: $ID } })
+          - pattern: |
+              $REPO.findUnique({ where: { id: $ID } })
+          - pattern: |
+              $REPO.findOneBy({ id: $ID })
+      - pattern-not-inside: |
+          if (...) {
+            ...
+            $REPO.$METHOD({ where: { ..., ownerId: $OWNER, ... } })
+            ...
+          }

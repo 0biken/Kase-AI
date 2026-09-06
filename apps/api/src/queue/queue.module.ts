@@ -2,6 +2,8 @@ import { Module, Global } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ALL_QUEUES } from './queue.constants';
 import { MAX_JOB_ATTEMPTS, redisConnection } from './queue.config';
+import { DurableQueueDispatcher } from './durable-queue-dispatcher';
+import { CancellationBusService } from './cancellation-bus.service';
 
 @Global()
 @Module({
@@ -23,6 +25,7 @@ import { MAX_JOB_ATTEMPTS, redisConnection } from './queue.config';
     // from workerOptionsFor(queue) when they land in M2.
     ...ALL_QUEUES.map((name) => BullModule.registerQueue({ name })),
   ],
-  exports: [BullModule],
+  providers: [CancellationBusService, DurableQueueDispatcher],
+  exports: [BullModule, CancellationBusService, DurableQueueDispatcher],
 })
 export class QueueModule {}

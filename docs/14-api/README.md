@@ -271,6 +271,73 @@ POST /api/v1/evidence/:id/replay         # replayable classes only
 
 Every access is written to the audit trail. Evidence can contain customer data; reading it is itself auditable.
 
+### M2 retention-policy API
+
+M2 exposes these contracts with organization- and project-administrator
+authorization.
+
+```http
+GET /api/v1/organizations/:id/evidence-policy
+PUT /api/v1/organizations/:id/evidence-policy       # organization administrator
+GET /api/v1/projects/:id/evidence-policy
+PUT /api/v1/projects/:id/evidence-policy            # project administrator
+```
+
+The organization `PUT` requires all four integer values. The project `PUT`
+accepts each value as an integer or `null`; null restores inheritance for that
+field. Values outside 1–365, fractions, and strings return RFC 9457 `422
+Unprocessable Content` with code `INVALID_RETENTION_DAYS`.
+
+```json
+{
+  "replayableEvidenceDays": 90,
+  "nonReplayableEvidenceDays": 30,
+  "rawToolOutputDays": 30,
+  "agentTranscriptDays": 30
+}
+```
+
+Project reads return both configured overrides and the effective policy, with a
+source for every field so clients do not have to reproduce precedence rules:
+
+```json
+{
+  "configured": {
+    "replayableEvidenceDays": null,
+    "nonReplayableEvidenceDays": 14,
+    "rawToolOutputDays": null,
+    "agentTranscriptDays": null
+  },
+  "effective": {
+    "replayableEvidenceDays": { "days": 90, "source": "organization" },
+    "nonReplayableEvidenceDays": { "days": 14, "source": "project" },
+    "rawToolOutputDays": { "days": 30, "source": "organization" },
+    "agentTranscriptDays": { "days": 30, "source": "platform" }
+  }
+}
+```
+
+Precedence is project override → organization default → platform default. Every
+successful change writes an append-only audit-trail event containing actor,
+scope, and before/after diffs but no evidence content. Shortening triggers
+rescheduling to earlier deadlines; extension affects only future captures.
+
+`GET /api/v1/evidence/:id/download` and `POST
+/api/v1/evidence/:id/replay` return this RFC 9457 response after tombstoning:
+
+```json
+{
+  "type": "https://kase.dev/errors/evidence-expired",
+  "title": "Evidence artifact expired",
+  "status": 410,
+  "detail": "The retained metadata is available, but the artifact bytes were deleted by policy.",
+  "code": "EVIDENCE_EXPIRED"
+}
+```
+
+The metadata endpoints continue to return the sanitized tombstone. A `410` must
+not issue a pre-signed URL, enqueue replay, or be represented as `404`.
+
 ## 9. Reports and gate
 
 ```http

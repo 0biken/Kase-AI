@@ -83,6 +83,18 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       detail = body;
     } else if (body && typeof body === 'object') {
       const b = body as Record<string, unknown>;
+      if (typeof b.code === 'string' && b.code in ERROR_CODES) {
+        const explicit = b.code as ErrorCode;
+        const configured = ERROR_CODES[explicit];
+        return {
+          type: typeof b.type === 'string' ? b.type : typeUriFor(explicit),
+          title: typeof b.title === 'string' ? b.title : configured.title,
+          status,
+          ...(typeof b.detail === 'string' ? { detail: b.detail } : {}),
+          ...(instance ? { instance } : {}),
+          code: explicit,
+        };
+      }
       if (typeof b.detail === 'string') detail = b.detail;
       else if (typeof b.message === 'string') detail = b.message;
       else if (Array.isArray(b.message)) {
@@ -117,6 +129,8 @@ export class ProblemDetailsFilter implements ExceptionFilter {
         return 'NOT_FOUND';
       case HttpStatus.CONFLICT:
         return 'CONFLICT';
+      case HttpStatus.GONE:
+        return 'EVIDENCE_EXPIRED';
       case HttpStatus.UNPROCESSABLE_ENTITY:
         return 'VALIDATION_FAILED';
       case HttpStatus.TOO_MANY_REQUESTS:
