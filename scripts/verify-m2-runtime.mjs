@@ -17,7 +17,7 @@ for (const forbidden of ['SchedulerModule', 'SastWorkerModule', 'RetentionWorker
   assert.ok(!new RegExp(`imports:[\\s\\S]*\\b${forbidden}\\b`).test(app), `API imports ${forbidden}`);
 }
 assert.ok(scheduler.includes('SchedulerWorkerService'));
-assert.ok(recon.includes('ReconWorkerService') && recon.includes('HttpJobConsumerService'));
+assert.ok(recon.includes('ReconWorkerService') && recon.includes('ReconPipelineConsumerService'));
 assert.ok(sast.includes('SastJobConsumerService'));
 assert.ok(retention.includes('RetentionRunnerService'));
 assert.match(dispatcher, /assertIdentifierOnlyPayload\(payload\)/u);

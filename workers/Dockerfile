@@ -34,7 +34,27 @@ ENTRYPOINT ["/usr/bin/tini", "--"]
 CMD ["node", "apps/api/dist/worker-main.js"]
 
 FROM worker-base AS worker-recon
-ENV KASE_WORKER_FAMILY=recon
+USER root
+ARG KATANA_VERSION=1.6.1
+ARG KATANA_SHA256=503754f1bd370c3ef287df6998e317baed2dd75bdd13ea64034f09b80ca393f3
+ARG HTTPX_VERSION=1.10.0
+ARG HTTPX_SHA256=63eac4dcd6e5c9867c94765fdaaf66e7b4eeae3474a1f06e600e266a1c81a53e
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends unzip \
+    && curl -fsSL "https://github.com/projectdiscovery/katana/releases/download/v${KATANA_VERSION}/katana_${KATANA_VERSION}_linux_amd64.zip" -o /tmp/katana.zip \
+    && echo "${KATANA_SHA256}  /tmp/katana.zip" | sha256sum -c - \
+    && unzip -q /tmp/katana.zip -d /tmp/katana \
+    && install -m 0755 /tmp/katana/katana /usr/local/bin/katana \
+    && curl -fsSL "https://github.com/projectdiscovery/httpx/releases/download/v${HTTPX_VERSION}/httpx_${HTTPX_VERSION}_linux_amd64.zip" -o /tmp/httpx.zip \
+    && echo "${HTTPX_SHA256}  /tmp/httpx.zip" | sha256sum -c - \
+    && unzip -q /tmp/httpx.zip -d /tmp/httpx \
+    && install -m 0755 /tmp/httpx/httpx /usr/local/bin/httpx \
+    && rm -rf /tmp/katana /tmp/httpx /tmp/katana.zip /tmp/httpx.zip /var/lib/apt/lists/*
+COPY --chown=10001:10001 workers/tool-inventory.json ./workers/tool-inventory.json
+ENV KASE_WORKER_FAMILY=recon \
+    KASE_KATANA_VERSION=1.6.1 \
+    KASE_HTTPX_VERSION=1.10.0
+USER 10001:10001
 
 FROM worker-base AS worker-browser
 ENV KASE_WORKER_FAMILY=browser

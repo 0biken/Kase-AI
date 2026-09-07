@@ -79,6 +79,8 @@ services:
       # bootFixture() directly and picks an ephemeral port instead.
       PORT: 3000
       FIXTURE_COMMIT_SHA: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0
+      FIXTURE_RECON_VERSION: ${KASE_FIXTURE_RECON_VERSION:-1}
+      FIXTURE_SLOW_RECON: ${KASE_FIXTURE_SLOW_RECON:-false}
     ports:
       - "3001:3000"
     networks:
@@ -93,6 +95,7 @@ services:
     image: ubuntu/squid:6.6-24.04_beta
     volumes:
       - ./infra/egress/squid.conf:/etc/squid/squid.conf:ro
+      - ./infra/egress/allowed-hosts.txt:/etc/squid/allowed-hosts.txt:ro
     networks:
       - recon-egress
       - target-net
@@ -184,6 +187,13 @@ services:
       KASE_LOCAL_KEK: ${KASE_LOCAL_KEK:?Set KASE_LOCAL_KEK to a 32-byte base64 key}
       KASE_EGRESS_PROXY: http://egress-proxy:3128
       KASE_WORKER_IMAGE_DIGEST: kase/worker-recon:dev
+      KASE_KATANA_VERSION: "1.6.1"
+      KASE_HTTPX_VERSION: "1.10.0"
+      HOME: /tmp
+      KASE_JOB_LEASE_MS: ${KASE_JOB_LEASE_MS:-60000}
+      KASE_JOB_HEARTBEAT_MS: ${KASE_JOB_HEARTBEAT_MS:-20000}
+      KASE_BULL_LOCK_DURATION_MS: ${KASE_BULL_LOCK_DURATION_MS:-60000}
+      KASE_BULL_STALLED_INTERVAL_MS: ${KASE_BULL_STALLED_INTERVAL_MS:-15000}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -203,6 +213,19 @@ services:
         limits:
           cpus: "1.0"
           memory: 512m
+
+  recon-trap:
+    image: node:22-alpine
+    command: ["node", "-e", "require('http').createServer((req,res)=>{console.log('TRAP_REQUEST '+req.url);res.end('trap')}).listen(3000,'0.0.0.0')"]
+    networks:
+      target-net:
+        aliases:
+          - trap
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
 
   scheduler:
     build:

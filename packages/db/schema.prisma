@@ -23,6 +23,7 @@ model Project {
   targets           Target[]
   scopePolicies     ScopePolicy[]
   audits            Audit[]
+  endpointInventories EndpointInventory[]
   findingIdentities FindingIdentity[]
   waivers           Waiver[]
   suppressions      Suppression[]
@@ -59,6 +60,7 @@ model Target {
   project        Project @relation(fields: [projectId], references: [id])
   authCredential Secret? @relation("TargetCredential", fields: [authCredentialId, projectId], references: [id, projectId], onDelete: Restrict)
   audits         Audit[]
+  endpointInventories EndpointInventory[]
 
   @@index([projectId])
   @@index([authCredentialId, projectId])
@@ -109,6 +111,8 @@ model Audit {
   passingChecks   PassingCheck[]
   gateEvaluations GateEvaluation[]
   events          AuditEvent[]
+  endpointInventory EndpointInventory?
+  reconRequestBudget ReconRequestBudget?
 
   @@unique([projectId, idempotencyKey])
   @@index([projectId, startedAt])
@@ -272,9 +276,40 @@ model SecretVersion {
   @@index([secretId, createdAt])
 }
 
+model ReconRequestBudget {
+  auditId     String   @id
+  maxRequests Int
+  reconLimit  Int
+  reserved    Int      @default(0)
+  consumed    Int      @default(0)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  audit Audit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+}
+
 model EndpointInventory {
-  id        String     @id
-  endpoints Endpoint[]
+  id                  String    @id
+  auditId             String    @unique
+  projectId           String
+  targetId            String
+  previousInventoryId String?
+  status              String    @default("building")
+  endpointCount       Int       @default(0)
+  addedCount          Int       @default(0)
+  removedCount        Int       @default(0)
+  changedCount        Int       @default(0)
+  generatedAt         DateTime? @db.Timestamptz(3)
+
+  audit             Audit                @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  project           Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  target            Target               @relation(fields: [targetId], references: [id], onDelete: Restrict)
+  previousInventory EndpointInventory?   @relation("InventoryHistory", fields: [previousInventoryId], references: [id], onDelete: SetNull)
+  nextInventories   EndpointInventory[]  @relation("InventoryHistory")
+  endpoints         Endpoint[]
+  drift             EndpointDrift[]
+
+  @@index([projectId, targetId, generatedAt])
+  @@index([previousInventoryId])
 }
 
 model Endpoint {
@@ -282,15 +317,37 @@ model Endpoint {
   inventoryId      String
   method           String
   pathTemplate     String
+  parameters       Json
   rawExamples      String[]
   discoveredBy     String[]
   statusObserved   Int[]
   contentType      String?
   requiresAuth     Boolean?
+  technologies     String[]
+  title            String?
+  server           String?
   firstSeenAuditId String
   lastSeenAuditId  String
 
-  inventory EndpointInventory @relation(fields: [inventoryId], references: [id])
+  inventory EndpointInventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  @@unique([inventoryId, method, pathTemplate])
+  @@index([inventoryId, pathTemplate])
+}
+
+model EndpointDrift {
+  id               String   @id
+  inventoryId      String
+  endpointKey      String
+  kind             String
+  previousMetadata Json?
+  currentMetadata  Json?
+  createdAt        DateTime @default(now()) @db.Timestamptz(3)
+
+  inventory EndpointInventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  @@unique([inventoryId, endpointKey, kind])
+  @@index([inventoryId, kind])
 }
 
 model CodeMap {

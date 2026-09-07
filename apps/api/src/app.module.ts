@@ -15,6 +15,7 @@ import { TokensModule } from './tokens/tokens.module';
 import { SecretsModule } from './secrets/secrets.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { FindingsModule } from './findings/findings.module';
+import { ReconModule } from './recon/recon.module';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { FindingsModule } from './findings/findings.module';
     OrchestratorModule,
     EvidenceModule,
     FindingsModule,
+    ReconModule,
     CorrelationModule,
     AssuranceModule,
     ProjectsModule,

@@ -2,6 +2,7 @@ import { Module, MiddlewareConsumer, NestModule, Injectable, NestMiddleware } fr
 import { InvoiceController } from './invoices/invoice.controller';
 import { InvoiceService } from './invoices/invoice.service';
 import { HealthController } from './health.controller';
+import { ReconFixtureController } from './recon.controller';
 import { prisma } from './db';
 
 /**
@@ -29,7 +30,7 @@ export class AuthMiddleware implements NestMiddleware {
 }
 
 @Module({
-  controllers: [InvoiceController, HealthController],
+  controllers: [InvoiceController, HealthController, ReconFixtureController],
   providers: [InvoiceService],
 })
 export class AppModule implements NestModule {

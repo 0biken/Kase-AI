@@ -25,7 +25,10 @@ export class OrchestratorService {
   }
 
   async detail(projectId: string, auditId: string) {
-    const audit = await this.prisma.audit.findFirst({ where: { id: auditId, projectId }, include: { jobs: true } });
+    const audit = await this.prisma.audit.findFirst({
+      where: { id: auditId, projectId },
+      include: { jobs: true, endpointInventory: { select: { id: true, status: true, endpointCount: true, addedCount: true, removedCount: true, changedCount: true, generatedAt: true } } },
+    });
     if (!audit) throw new ProblemException('NOT_FOUND', 'Audit does not belong to this project');
     return audit;
   }
@@ -128,6 +131,13 @@ export class OrchestratorService {
           notExecutedCategories: [],
         },
       });
+      if (requestedCategories.includes('http') && policy) {
+        await tx.reconRequestBudget.create({ data: {
+          auditId,
+          maxRequests: policy.maxRequestsPerAudit,
+          reconLimit: Math.max(1, Math.floor(policy.maxRequestsPerAudit * 0.4)),
+        } });
+      }
       for (const template of templates) {
         await tx.auditJob.create({ data: {
           id: jobIds.get(template.kind)!, auditId, kind: template.kind,
@@ -135,6 +145,7 @@ export class OrchestratorService {
           status: 'queued',
           dependsOn: template.dependsOnKinds.map((kind) => jobIds.get(kind)!),
           timeoutMs: Math.min(template.timeoutMs, dto.maxWallTimeMs ?? template.timeoutMs),
+          maxRetries: template.maxRetries,
           required: template.required,
         } });
       }

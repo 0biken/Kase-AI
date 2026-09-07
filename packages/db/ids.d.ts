@@ -14,6 +14,7 @@ export declare const ID_PREFIX: {
   readonly evidence: 'ev';
   readonly endpointInventory: 'einv';
   readonly endpoint: 'ep';
+  readonly endpointDrift: 'edrift';
   readonly codeMap: 'cmap';
   readonly routeMapping: 'rmap';
   readonly findingIdentity: 'fid';

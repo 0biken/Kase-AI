@@ -165,6 +165,14 @@ POST /api/v1/projects/prj_01H.../audits
 }
 ```
 
+The M3 inventory route returns the ready snapshot, summary and drift counts,
+paginated endpoints, and persisted drift records. It accepts `method`, `path`,
+`source`, `statusClass`, `technology`, `drift`, `cursor`, and `limit` filters.
+Stable ordering is method, path template, then endpoint ID. A valid audit whose
+inventory pipeline is still running returns RFC 9457 `409` with code
+`INVENTORY_NOT_READY`; cross-project lookups remain indistinguishable from a
+missing audit and return `404`.
+
 The M1 implementation exposes a deliberately narrow vertical slice of this contract: `mode: "smoke"`, one `targetId`, and `category: "fixture_health"`. It creates one recon job and places only `auditId`, `auditJobId`, and `projectId` in Redis. The full request shape above is introduced by M2 orchestration.
 
 Response includes `buildProvenance`, so a caller sees immediately whether correlation will be gate-eligible:

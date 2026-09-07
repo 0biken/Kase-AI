@@ -10,10 +10,21 @@ import { RetentionModule } from '../retention/retention.module';
 import { AuditJobLifecycleService } from '../orchestrator/audit-job-lifecycle.service';
 import { CancellationSignalRegistry } from '../orchestrator/cancellation-signal.registry';
 import { EvidenceModule } from '../evidence/evidence.module';
-import { HttpJobConsumerService } from './http-job-consumer.service';
+import { ReconPipelineConsumerService } from './recon-pipeline-consumer.service';
+import { KatanaAdapter } from '../adapters/recon/katana.adapter';
+import { HttpxAdapter } from '../adapters/recon/httpx.adapter';
+import { ReconScopeService } from '../recon/recon-scope.service';
+import { ReconBudgetService } from '../recon/recon-budget.service';
+import { HostRateLeaseService } from '../recon/host-rate-lease.service';
+import { ReconEvidenceService } from '../recon/recon-evidence.service';
+import { InventoryService } from '../recon/inventory.service';
 
 @Module({
   imports: [PrismaModule, QueueModule, StorageModule, AuditTrailModule, SecretsModule, AuditEventsModule, RetentionModule, EvidenceModule],
-  providers: [AuditJobLifecycleService, CancellationSignalRegistry, ReconWorkerService, HttpJobConsumerService],
+  providers: [
+    AuditJobLifecycleService, CancellationSignalRegistry, ReconWorkerService,
+    KatanaAdapter, HttpxAdapter, ReconScopeService, ReconBudgetService, HostRateLeaseService,
+    ReconEvidenceService, InventoryService, ReconPipelineConsumerService,
+  ],
 })
 export class WorkerModule {}

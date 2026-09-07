@@ -25,6 +25,7 @@ const ID_PREFIX = {
   evidence: 'ev',
   endpointInventory: 'einv',
   endpoint: 'ep',
+  endpointDrift: 'edrift',
   codeMap: 'cmap',
   routeMapping: 'rmap',
   findingIdentity: 'fid',

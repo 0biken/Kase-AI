@@ -215,6 +215,18 @@ Target Inventory
 └── HTTP metadata (headers, TLS, status classes)
 ```
 
+## 11. M3 deterministic implementation contract
+
+M3 persists the network path as five independently resumable jobs:
+
+```
+katana_discover -> scope_filter -> httpx_verify -> inventory_merge -> inventory_drift
+```
+
+Katana and httpx receive only the identifier-only queue payload and resolve the target and latest attested scope policy from PostgreSQL. Katana's native scope is a first boundary; every emitted URL and every redirect is then revalidated by Kase before it can enter the httpx input. A Redis host lease serializes network-producing recon stages across audits for one host and port, while `ReconRequestBudget` provides durable per-audit reservation and consumption accounting.
+
+Each completed audit owns one immutable inventory snapshot. Endpoint rows merge by `(method, pathTemplate)` and retain bounded examples and source provenance. Drift compares the snapshot with the latest earlier ready inventory for the same target. Added, removed, and metadata-changed endpoints are stored as reportable signals but do not block a release in M3.
+
 ---
 
 **Next:** [07 — Tool Adapters](../07-tool-adapters/README.md)

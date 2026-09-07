@@ -12,14 +12,18 @@ describe('orchestrator durable job graph', () => {
 
   it('fans HTTP and Semgrep out in full mode', () => {
     expect(graphTemplate('full').map((job) => job.kind)).toEqual([
-      'build_provenance', 'semgrep', 'http', 'normalize_severity',
+      'build_provenance', 'semgrep', 'katana_discover', 'scope_filter', 'httpx_verify',
+      'inventory_merge', 'inventory_drift', 'normalize_severity',
     ]);
+    expect(graphTemplate('full').at(-1)).toMatchObject({ kind: 'normalize_severity', dependsOnKinds: ['semgrep'] });
   });
 
   it('persists only explicitly selected full-mode adapters', () => {
     expect(graphTemplate('full', ['http']).map((job) => job.kind)).toEqual([
-      'build_provenance', 'http', 'normalize_severity',
+      'build_provenance', 'katana_discover', 'scope_filter', 'httpx_verify',
+      'inventory_merge', 'inventory_drift',
     ]);
+    expect(graphTemplate('full', ['http']).find((job) => job.kind === 'scope_filter')).toMatchObject({ maxRetries: 0, timeoutMs: 120_000 });
   });
 
   it('selects at most four ready jobs after dependencies terminally settle', () => {

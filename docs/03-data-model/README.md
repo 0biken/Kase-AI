@@ -561,6 +561,13 @@ ProjectEvidenceRetentionOverride {
 }
 ```
 
+M3 makes `EndpointInventory` an audit-owned snapshot with `auditId`,
+`projectId`, `targetId`, an optional link to the previous ready inventory, and
+persisted endpoint/drift counts. `EndpointDrift` records `added`, `removed`, or
+`changed` against a stable `METHOD pathTemplate` key. `ReconRequestBudget`
+atomically tracks reserved and consumed requests under the audit's 40% recon
+allocation; database checks prevent negative accounting or exceeding the cap.
+
 The effective value for each field is resolved independently as **project
 override → organization default → platform default**. `expiresAt` is fixed when
 an artifact is captured. A shorter effective policy updates existing live rows

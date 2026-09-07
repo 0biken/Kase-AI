@@ -18,6 +18,11 @@ export const QUEUE_REPORT = 'report';
 export const QUEUE_PROVENANCE = 'build-provenance';
 export const QUEUE_SEMGREP = 'semgrep';
 export const QUEUE_HTTP = 'http';
+export const QUEUE_KATANA_DISCOVER = 'katana-discover';
+export const QUEUE_SCOPE_FILTER = 'scope-filter';
+export const QUEUE_HTTPX_VERIFY = 'httpx-verify';
+export const QUEUE_INVENTORY_MERGE = 'inventory-merge';
+export const QUEUE_INVENTORY_DRIFT = 'inventory-drift';
 export const QUEUE_NORMALIZE_SEVERITY = 'normalize-severity';
 
 export const JOB_QUEUES = [
@@ -30,6 +35,11 @@ export const JOB_QUEUES = [
   QUEUE_PROVENANCE,
   QUEUE_SEMGREP,
   QUEUE_HTTP,
+  QUEUE_KATANA_DISCOVER,
+  QUEUE_SCOPE_FILTER,
+  QUEUE_HTTPX_VERIFY,
+  QUEUE_INVENTORY_MERGE,
+  QUEUE_INVENTORY_DRIFT,
   QUEUE_NORMALIZE_SEVERITY,
 ] as const;
 
@@ -48,5 +58,10 @@ export const QUEUE_BY_JOB_KIND: Record<string, QueueName> = {
   build_provenance: QUEUE_PROVENANCE,
   semgrep: QUEUE_SEMGREP,
   http: QUEUE_HTTP,
+  katana_discover: QUEUE_KATANA_DISCOVER,
+  scope_filter: QUEUE_SCOPE_FILTER,
+  httpx_verify: QUEUE_HTTPX_VERIFY,
+  inventory_merge: QUEUE_INVENTORY_MERGE,
+  inventory_drift: QUEUE_INVENTORY_DRIFT,
   normalize_severity: QUEUE_NORMALIZE_SEVERITY,
 };

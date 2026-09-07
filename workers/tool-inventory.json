@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "tools": [
+    {
+      "name": "katana",
+      "version": "1.6.1",
+      "source": "https://github.com/projectdiscovery/katana/releases/tag/v1.6.1",
+      "artifact": "https://github.com/projectdiscovery/katana/releases/download/v1.6.1/katana_1.6.1_linux_amd64.zip",
+      "sha256": "503754f1bd370c3ef287df6998e317baed2dd75bdd13ea64034f09b80ca393f3",
+      "license": "MIT",
+      "licenseUrl": "https://github.com/projectdiscovery/katana/blob/v1.6.1/LICENSE.md"
+    },
+    {
+      "name": "httpx",
+      "version": "1.10.0",
+      "source": "https://github.com/projectdiscovery/httpx/releases/tag/v1.10.0",
+      "artifact": "https://github.com/projectdiscovery/httpx/releases/download/v1.10.0/httpx_1.10.0_linux_amd64.zip",
+      "sha256": "63eac4dcd6e5c9867c94765fdaaf66e7b4eeae3474a1f06e600e266a1c81a53e",
+      "license": "MIT",
+      "licenseUrl": "https://github.com/projectdiscovery/httpx/blob/v1.10.0/LICENSE.md"
+    }
+  ]
+}

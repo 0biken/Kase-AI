@@ -43,6 +43,7 @@ export const ERROR_CODES = {
   NOT_FOUND: { status: HttpStatus.NOT_FOUND, title: 'Resource not found' },
   CONFLICT: { status: HttpStatus.CONFLICT, title: 'Resource conflict' },
   EVIDENCE_EXPIRED: { status: HttpStatus.GONE, title: 'Evidence artifact expired' },
+  INVENTORY_NOT_READY: { status: HttpStatus.CONFLICT, title: 'Endpoint inventory is not ready' },
   IDEMPOTENCY_KEY_REQUIRED: {
     status: HttpStatus.BAD_REQUEST,
     title: 'Idempotency-Key header is required',

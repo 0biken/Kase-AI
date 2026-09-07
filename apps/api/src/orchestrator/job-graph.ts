@@ -101,7 +101,8 @@ export function blockedJobs(nodes: readonly JobGraphNode[]): JobGraphNode[] {
 }
 
 export interface JobTemplate {
-  kind: 'build_provenance' | 'http' | 'semgrep' | 'normalize_severity' | 'recon';
+  kind: 'build_provenance' | 'semgrep' | 'normalize_severity' | 'recon' |
+    'katana_discover' | 'scope_filter' | 'httpx_verify' | 'inventory_merge' | 'inventory_drift';
   category: string | null;
   dependsOnKinds: readonly JobTemplate['kind'][];
   timeoutMs: number;
@@ -111,10 +112,14 @@ export interface JobTemplate {
 
 export const ADAPTER_TIMEOUTS_MS = {
   build_provenance: 5 * 60_000,
-  http: 60_000,
   semgrep: 10 * 60_000,
   normalize_severity: 2 * 60_000,
   recon: 10 * 60_000,
+  katana_discover: 10 * 60_000,
+  scope_filter: 2 * 60_000,
+  httpx_verify: 5 * 60_000,
+  inventory_merge: 2 * 60_000,
+  inventory_drift: 2 * 60_000,
 } as const;
 
 export function graphTemplate(
@@ -128,23 +133,32 @@ export function graphTemplate(
     }];
   }
   const selected = categories ?? (mode === 'full' ? ['sast', 'http'] : ['sast']);
-  const adapterKinds: JobTemplate['kind'][] = selected.map((category) => category === 'sast' ? 'semgrep' : 'http');
-  return [
+  const jobs: JobTemplate[] = [
     {
       kind: 'build_provenance', category: null, dependsOnKinds: [],
       timeoutMs: ADAPTER_TIMEOUTS_MS.build_provenance, maxRetries: 2, required: true,
     },
-    ...adapterKinds.map((kind): JobTemplate => ({
-      kind,
-      category: kind === 'semgrep' ? 'sast' : 'http',
-      dependsOnKinds: ['build_provenance'],
-      timeoutMs: ADAPTER_TIMEOUTS_MS[kind],
-      maxRetries: 2,
-      required: true,
-    })),
-    {
-      kind: 'normalize_severity', category: null, dependsOnKinds: adapterKinds,
-      timeoutMs: ADAPTER_TIMEOUTS_MS.normalize_severity, maxRetries: 2, required: true,
-    },
   ];
+  if (selected.includes('sast')) {
+    jobs.push({
+      kind: 'semgrep', category: 'sast', dependsOnKinds: ['build_provenance'],
+      timeoutMs: ADAPTER_TIMEOUTS_MS.semgrep, maxRetries: 2, required: true,
+    });
+  }
+  if (selected.includes('http')) {
+    jobs.push(
+      { kind: 'katana_discover', category: 'http', dependsOnKinds: ['build_provenance'], timeoutMs: ADAPTER_TIMEOUTS_MS.katana_discover, maxRetries: 2, required: true },
+      { kind: 'scope_filter', category: 'http', dependsOnKinds: ['katana_discover'], timeoutMs: ADAPTER_TIMEOUTS_MS.scope_filter, maxRetries: 0, required: true },
+      { kind: 'httpx_verify', category: 'http', dependsOnKinds: ['scope_filter'], timeoutMs: ADAPTER_TIMEOUTS_MS.httpx_verify, maxRetries: 2, required: true },
+      { kind: 'inventory_merge', category: 'http', dependsOnKinds: ['httpx_verify'], timeoutMs: ADAPTER_TIMEOUTS_MS.inventory_merge, maxRetries: 2, required: true },
+      { kind: 'inventory_drift', category: 'http', dependsOnKinds: ['inventory_merge'], timeoutMs: ADAPTER_TIMEOUTS_MS.inventory_drift, maxRetries: 2, required: true },
+    );
+  }
+  if (selected.includes('sast')) {
+    jobs.push({
+      kind: 'normalize_severity', category: null, dependsOnKinds: ['semgrep'],
+      timeoutMs: ADAPTER_TIMEOUTS_MS.normalize_severity, maxRetries: 2, required: true,
+    });
+  }
+  return jobs;
 }
