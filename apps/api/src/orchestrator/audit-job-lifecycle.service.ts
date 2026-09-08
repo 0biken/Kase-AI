@@ -48,18 +48,18 @@ export class AuditJobLifecycleService {
     });
   }
 
-  async heartbeat(auditJobId: string, leaseMs = DEFAULT_LEASE_MS): Promise<boolean> {
+  async heartbeat(auditJobId: string, leaseMs = DEFAULT_LEASE_MS, attempt?: number): Promise<boolean> {
     const now = new Date();
     const result = await this.prisma.auditJob.updateMany({
-      where: { id: auditJobId, status: 'running' },
+      where: { id: auditJobId, status: 'running', ...(attempt === undefined ? {} : { attempts: attempt }) },
       data: { heartbeatAt: now, leaseExpiresAt: new Date(now.getTime() + leaseMs) },
     });
     return result.count === 1;
   }
 
-  async succeed(payload: ReconAuditJobPayload): Promise<void> {
+  async succeed(payload: ReconAuditJobPayload, attempt?: number): Promise<void> {
     const changed = await this.prisma.auditJob.updateMany({
-      where: { id: payload.auditJobId, auditId: payload.auditId, status: 'running' },
+      where: { id: payload.auditJobId, auditId: payload.auditId, status: 'running', ...(attempt === undefined ? {} : { attempts: attempt }) },
       data: { status: 'succeeded', finishedAt: new Date(), heartbeatAt: null, leaseExpiresAt: null },
     });
     if (changed.count === 1) await this.events.append(payload.auditId, 'job.succeeded', { jobId: payload.auditJobId });
@@ -73,13 +73,16 @@ export class AuditJobLifecycleService {
     } else await this.queues.wakeScheduler(payload);
   }
 
-  async fail(payload: ReconAuditJobPayload, error: unknown): Promise<void> {
-    const job = await this.prisma.auditJob.findFirst({ where: { id: payload.auditJobId, auditId: payload.auditId } });
+  async fail(payload: ReconAuditJobPayload, error: unknown, attempt?: number): Promise<void> {
+    const job = await this.prisma.auditJob.findFirst({ where: { id: payload.auditJobId, auditId: payload.auditId, ...(attempt === undefined ? {} : { attempts: attempt }) } });
     if (!job || job.status !== 'running') return;
     const errorClass = classifyJobError(error);
     const decision = retryDecision(errorClass, job.attempts, job.maxRetries, job.timeoutMs);
-    await this.prisma.auditJob.update({
-      where: { id: job.id },
+    // A recovered job may have been claimed for a newer attempt after the
+    // stale worker read it.  Make the terminal/retry write conditional too;
+    // otherwise that stale worker could overwrite the current attempt.
+    const changed = await this.prisma.auditJob.updateMany({
+      where: { id: job.id, status: 'running', attempts: job.attempts },
       data: decision.retry ? {
         status: 'queued', timeoutMs: decision.timeoutMs, enqueuedAt: null,
         heartbeatAt: null, leaseExpiresAt: null, error: safeError(error), errorClass,
@@ -88,6 +91,7 @@ export class AuditJobLifecycleService {
         leaseExpiresAt: null, error: safeError(error), errorClass,
       },
     });
+    if (changed.count !== 1) return;
     await this.events.append(payload.auditId, decision.retry ? 'job.retrying' : `job.${decision.terminalStatus}`, {
       jobId: payload.auditJobId, errorClass, attempts: job.attempts,
     });

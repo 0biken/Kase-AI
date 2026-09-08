@@ -16,23 +16,32 @@ interface EndpointSnapshot {
 export class InventoryService {
   constructor(private readonly prisma: PrismaService, private readonly events: AuditEventsService) {}
 
-  async merge(auditId: string, projectId: string, candidates: readonly VerifiedEndpointCandidate[], signal: AbortSignal) {
-    const audit = await this.prisma.audit.findFirst({ where: { id: auditId, projectId }, select: { id: true, targetId: true } });
-    if (!audit?.targetId) throw new Error('Recon inventory requires an audit target');
-    const previous = await this.prisma.endpointInventory.findFirst({
-      where: { projectId, targetId: audit.targetId, status: 'ready', auditId: { not: auditId } },
-      orderBy: { generatedAt: 'desc' }, include: { endpoints: true },
-    });
+  async merge(auditId: string, projectId: string, candidates: readonly VerifiedEndpointCandidate[], signal: AbortSignal, auditJobId?: string, attempt?: number) {
     const inventoryId = deterministicId('einv', auditId);
-    const previousByKey = new Map((previous?.endpoints ?? []).map((endpoint) => [endpointKey(endpoint.method, endpoint.pathTemplate), endpoint]));
     const merged = mergeCandidates(candidates);
     if (signal.aborted) throw abortError();
     await this.prisma.$transaction(async (tx: any) => {
       throwIfAborted(signal);
+      if (auditJobId !== undefined && attempt !== undefined) await assertWritable(tx, auditId, projectId, auditJobId, attempt);
+      const audit = await tx.audit.findFirst({ where: { id: auditId, projectId }, select: { id: true, targetId: true, startedAt: true } });
+      if (!audit?.targetId) throw new Error('Recon inventory requires an audit target');
+      // This lock serializes baseline selection for a target. A current audit
+      // can only inherit a snapshot from an audit that was already terminal
+      // when this audit began, preventing concurrent history forks/cycles.
+      await tx.$queryRawUnsafe('SELECT id FROM "Target" WHERE id = $1 FOR UPDATE', audit.targetId);
+      const previous = await tx.endpointInventory.findFirst({
+        where: {
+          projectId, targetId: audit.targetId, status: 'ready', auditId: { not: auditId },
+          audit: { is: { status: { in: ['completed', 'partial'] }, completedAt: { lte: audit.startedAt } } },
+        },
+        orderBy: [{ audit: { completedAt: 'desc' } }, { id: 'desc' }], include: { endpoints: true },
+      });
+      const previousByKey = new Map<string, { firstSeenAuditId: string }>((previous?.endpoints ?? []).map((endpoint: any) => [endpointKey(endpoint.method, endpoint.pathTemplate), endpoint]));
       await tx.endpointInventory.upsert({
         where: { auditId },
         create: { id: inventoryId, auditId, projectId, targetId: audit.targetId, previousInventoryId: previous?.id ?? null },
-        update: { previousInventoryId: previous?.id ?? null, status: 'building', generatedAt: null },
+        // A retry must keep the baseline chosen by its first merge attempt.
+        update: { status: 'building', generatedAt: null },
       });
       await tx.endpoint.deleteMany({ where: { inventoryId } });
       for (const candidate of merged) {
@@ -52,7 +61,7 @@ export class InventoryService {
     return { inventoryId, endpointCount: merged.length };
   }
 
-  async computeDrift(auditId: string, projectId: string, signal: AbortSignal) {
+  async computeDrift(auditId: string, projectId: string, signal: AbortSignal, auditJobId?: string, attempt?: number) {
     const inventory = await this.prisma.endpointInventory.findFirst({
       where: { auditId, projectId }, include: { endpoints: true, previousInventory: { include: { endpoints: true } } },
     });
@@ -69,6 +78,7 @@ export class InventoryService {
     if (signal.aborted) throw abortError();
     await this.prisma.$transaction(async (tx: any) => {
       throwIfAborted(signal);
+      if (auditJobId !== undefined && attempt !== undefined) await assertWritable(tx, auditId, projectId, auditJobId, attempt);
       await tx.endpointDrift.deleteMany({ where: { inventoryId: inventory.id } });
       for (const item of drift) {
         throwIfAborted(signal);
@@ -136,3 +146,10 @@ function unique<T>(values: T[]): T[] { return [...new Set(values)]; }
 function unionByName(left: any[], right: any[]): any[] { return [...new Map([...left, ...right].map((item) => [item.name, item])).values()].sort((a, b) => a.name.localeCompare(b.name)); }
 function abortError(): Error { const error = new Error('Audit cancellation requested'); error.name = 'AbortError'; return error; }
 function throwIfAborted(signal: AbortSignal): void { if (signal.aborted) throw abortError(); }
+async function assertWritable(tx: any, auditId: string, projectId: string, auditJobId: string, attempt: number): Promise<void> {
+  const job = await tx.auditJob.findFirst({ where: {
+    id: auditJobId, auditId, status: 'running', attempts: attempt,
+    audit: { is: { projectId, cancellationRequestedAt: null } },
+  }, select: { id: true } });
+  if (!job) throw abortError();
+}

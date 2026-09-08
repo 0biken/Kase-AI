@@ -113,6 +113,7 @@ model Audit {
   events          AuditEvent[]
   endpointInventory EndpointInventory?
   reconRequestBudget ReconRequestBudget?
+  reconRequestReservations ReconRequestReservation[]
 
   @@unique([projectId, idempotencyKey])
   @@index([projectId, startedAt])
@@ -156,6 +157,7 @@ model AuditJob {
 
   audit      Audit           @relation(fields: [auditId], references: [id])
   executions ToolExecution[]
+  reconRequestReservations ReconRequestReservation[]
 
   @@index([auditId, status])
   @@index([leaseExpiresAt])
@@ -285,6 +287,29 @@ model ReconRequestBudget {
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
   audit Audit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+}
+
+/// A network-request allocation belongs to one durable adapter-job stage.
+/// Active reservations expire with the worker lease. Scheduler recovery charges
+/// the full unknown allocation before a retry may produce more network traffic.
+model ReconRequestReservation {
+  id             String   @id
+  auditId        String
+  auditJobId     String
+  stage          String
+  reservedCount  Int
+  consumedCount  Int      @default(0)
+  status         String   @default("active") // 'active' | 'settled' | 'reclaimed'
+  leaseExpiresAt DateTime @db.Timestamptz(3)
+  createdAt      DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @db.Timestamptz(3)
+
+  audit Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  job   AuditJob @relation(fields: [auditJobId], references: [id], onDelete: Cascade)
+
+  @@unique([auditJobId, stage])
+  @@index([auditId, status, leaseExpiresAt])
+  @@index([auditJobId, status])
 }
 
 model EndpointInventory {

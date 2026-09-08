@@ -79,7 +79,7 @@ One correlated finding, both evidence artifacts preserved, gate blocks the build
 
 ## Delivery
 
-[**Current verified progress: 48/130 tasks complete**](TASKS.md) — Phase 0 is 14/15, M1 is 16/16, and M2 is 18/18. The retained-stack M2 acceptance evidence, including worker recovery, cancellation, MinIO hash verification, and retention tombstoning, is recorded in [`GATES-M2-LIVE.md`](GATES-M2-LIVE.md).
+[**Current verified progress: 57/130 tasks complete**](TASKS.md) — Phase 0 is 14/15, M1 is 16/16, M2 is 18/18, and M3 is 9/9. The retained-stack M3 acceptance evidence, including canonical inventory, denied discovery, drift, shared limits, crash recovery, live Katana/httpx cancellation, and MinIO hash verification, is recorded in [`GATES-M3.md`](GATES-M3.md).
 
 [TASKS.md](TASKS.md) is the executable checklist — 130 tasks across Phase 0 and M1–M7, with milestone exit criteria as the real gates. The Semgrep licensing and evidence-policy decisions are closed; the LLM provider contract is the only remaining Phase 0 item and does not block M2.
 
@@ -124,4 +124,4 @@ Their `references/` payloads (`test-categories.md`, `whitebox-categories.md`, `f
 
 ## Status
 
-M1 and M2 are implemented and verified by static checks and live Docker Compose proofs. The retained M2 stack demonstrates a Semgrep-only audit with exact build provenance, normalized authoritative-severity findings, independently hash-verified MinIO evidence, duplicate-free worker-crash recovery, real subprocess cancellation, and hard object deletion with metadata-only `410 Gone` tombstones. No AI workload participates in M2. See [19 — Roadmap](docs/19-roadmap/README.md#3-milestones).
+M1 through M3 are implemented and verified by static checks and live Docker Compose proofs. The retained stack demonstrates the M2 Semgrep/evidence lifecycle and the M3 Katana/httpx recon pipeline: every discovered URL re-enters scope validation, duplicate URL variants merge into canonical endpoints, cross-audit drift is persisted, host rate limits are serialized, crash recovery remains duplicate-free, and both recon subprocesses stop under cancellation. No AI workload participates through M3. See [19 — Roadmap](docs/19-roadmap/README.md#3-milestones).

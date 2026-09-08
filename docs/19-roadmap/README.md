@@ -94,6 +94,8 @@ M2 is complete. The static recovery suite and retained live Compose proof pass: 
 - Persisted `EndpointInventory` with cross-audit drift
 - Global per-host rate limiting
 
+M3 is complete. The static recovery suite, fresh six-migration deployment, and retained live Compose proof pass. The fixture crawl produces a canonical inventory with technology metadata, records and blocks denied path/host discoveries, independently verifies Katana and httpx evidence hashes, persists added/removed/changed drift, serializes concurrent audits by host, recovers an interrupted worker without duplicate artifacts or request reservations, and terminates live Katana and httpx processes through cancellation. M1 and M2 live proofs also pass against the same rebuilt images.
+
 **Exit:** a crawl produces a canonical inventory; out-of-scope URLs are denied and logged.
 
 ### M4 — Agent runtime (weeks 9–12)

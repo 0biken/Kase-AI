@@ -6,6 +6,7 @@ import type { ReconAuditJobPayload } from './audit-job.payload';
 import { assertAuditTransition, completionStatus, isTerminalAuditStatus } from './audit-state-machine';
 import { blockedJobs, readyJobs, TERMINAL_JOB_STATUSES, type JobGraphNode } from './job-graph';
 import { newId } from '../common/ids';
+import { ReconBudgetService } from '../recon/recon-budget.service';
 
 const DEFAULT_LEASE_MS = 60_000;
 
@@ -25,6 +26,7 @@ export class AuditSchedulerService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly queues: DurableQueueDispatcher,
+    private readonly budgets: ReconBudgetService,
   ) {}
 
   async advance(auditId: string): Promise<void> {
@@ -95,6 +97,7 @@ export class AuditSchedulerService {
   }
 
   async recover(now = new Date()): Promise<void> {
+    await this.budgets.reclaimExpired(now);
     const expired: StoredJob[] = await (this.prisma.auditJob as any).findMany({
       where: { status: 'running', leaseExpiresAt: { lt: now } },
       orderBy: { id: 'asc' },

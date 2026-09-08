@@ -4,11 +4,11 @@ Executable form of [19 — Roadmap](docs/19-roadmap/README.md). Ordered by depen
 
 **Legend:** `[x]` done · `[~]` partially done · `[ ]` not started · **⚠** blocks other work
 
-**130 tasks, 48 done.** Counts include milestone exit criteria, which are the real gates.
+**130 tasks, 57 done.** Counts include milestone exit criteria, which are the real gates.
 
 | | Phase 0 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | Invariants |
 |---|---|---|---|---|---|---|---|---|---|
-| Done | 14 | 16 | 18 | 0 | 0 | 0 | 0 | 0 | 0 |
+| Done | 14 | 16 | 18 | 9 | 0 | 0 | 0 | 0 | 0 |
 | Total | 15 | 16 | 18 | 9 | 15 | 14 | 16 | 19 | 8 |
 
 ---
@@ -103,17 +103,17 @@ Non-code work that blocks code. Only the M4 LLM provider contract remains open.
 
 **Goal:** a crawl produces a canonical inventory; out-of-scope URLs are denied and logged.
 
-- [ ] `katana` adapter
-- [ ] `httpx` adapter with tech fingerprinting
-- [ ] **⚠ Scope validator on every discovered URL** — discovery must never be a scope-escalation path ([06 §5](docs/06-recon/README.md#5-every-discovered-url-re-enters-the-scope-validator))
-- [ ] Path-template normalization (`/api/invoices/123` → `/api/invoices/{id}`)
-- [ ] Inventory merge across discovery sources with provenance per endpoint
-- [ ] Persisted `EndpointInventory` — first-class, not transient
-- [ ] Cross-audit endpoint drift (appeared/disappeared) as a reportable signal
-- [ ] Global per-host rate limiting, `maxRequestsPerAudit` enforcement
+- [x] `katana` adapter
+- [x] `httpx` adapter with tech fingerprinting
+- [x] **⚠ Scope validator on every discovered URL** — discovery must never be a scope-escalation path ([06 §5](docs/06-recon/README.md#5-every-discovered-url-re-enters-the-scope-validator))
+- [x] Path-template normalization (`/api/invoices/123` → `/api/invoices/{id}`)
+- [x] Inventory merge across discovery sources with provenance per endpoint
+- [x] Persisted `EndpointInventory` — first-class, not transient
+- [x] Cross-audit endpoint drift (appeared/disappeared) as a reportable signal
+- [x] Global per-host rate limiting, `maxRequestsPerAudit` enforcement
 
 **Exit criteria**
-- [ ] Crawl of the fixture yields a canonical inventory; an out-of-scope URL discovered mid-crawl is denied, logged, and never probed
+- [x] Crawl of the fixture yields a canonical inventory; an out-of-scope URL discovered mid-crawl is denied, logged, and never probed
 
 ---
 

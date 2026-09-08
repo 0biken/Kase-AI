@@ -30,6 +30,18 @@ describe('AuditJobLifecycleService', () => {
     expect(events.append).not.toHaveBeenCalledWith('aud_1', 'audit.status', expect.anything());
   });
 
+  it('fences stale attempts from renewing or completing a newer retry', async () => {
+    const prisma: any = {
+      auditJob: { updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+      audit: { findUnique: jest.fn().mockResolvedValue({ mode: 'full' }) },
+    };
+    const lifecycle = new AuditJobLifecycleService(prisma, { wakeScheduler: jest.fn() } as never, { append: jest.fn() } as never);
+    await expect(lifecycle.heartbeat('job_1', 60_000, 1)).resolves.toBe(false);
+    await lifecycle.succeed(payload, 1);
+    expect(prisma.auditJob.updateMany).toHaveBeenNthCalledWith(1, expect.objectContaining({ where: { id: 'job_1', status: 'running', attempts: 1 } }));
+    expect(prisma.auditJob.updateMany).toHaveBeenNthCalledWith(2, expect.objectContaining({ where: { id: 'job_1', auditId: 'aud_1', status: 'running', attempts: 1 } }));
+  });
+
   it('re-enqueues a transient smoke retry without requiring the M2 scheduler', async () => {
     jest.useFakeTimers();
     try {
@@ -38,7 +50,7 @@ describe('AuditJobLifecycleService', () => {
           findFirst: jest.fn().mockResolvedValue({
             id: 'job_1', kind: 'recon', status: 'running', attempts: 1, maxRetries: 2, timeoutMs: 600_000,
           }),
-          update: jest.fn().mockResolvedValue(undefined),
+          updateMany: jest.fn().mockResolvedValue({ count: 1 }),
         },
         audit: { findUnique: jest.fn().mockResolvedValue({ mode: 'smoke' }) },
       };
@@ -52,5 +64,26 @@ describe('AuditJobLifecycleService', () => {
     } finally {
       jest.useRealTimers();
     }
+  });
+
+  it('does not let a stale failure overwrite a newer attempt', async () => {
+    const prisma: any = {
+      auditJob: {
+        findFirst: jest.fn().mockResolvedValue({ id: 'job_1', kind: 'katana_discover', status: 'running', attempts: 1, maxRetries: 2, timeoutMs: 600_000 }),
+        updateMany: jest.fn().mockResolvedValue({ count: 0 }),
+      },
+      audit: { findUnique: jest.fn().mockResolvedValue({ mode: 'full' }) },
+    };
+    const queues = { wakeScheduler: jest.fn() };
+    const events = { append: jest.fn() };
+    const lifecycle = new AuditJobLifecycleService(prisma, queues as never, events as never);
+
+    await lifecycle.fail(payload, new Error('temporary network error'), 1);
+
+    expect(prisma.auditJob.updateMany).toHaveBeenCalledWith(expect.objectContaining({
+      where: { id: 'job_1', status: 'running', attempts: 1 },
+    }));
+    expect(events.append).not.toHaveBeenCalled();
+    expect(queues.wakeScheduler).not.toHaveBeenCalled();
   });
 });

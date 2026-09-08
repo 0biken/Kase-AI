@@ -106,9 +106,10 @@ function Get-ReconProcessList {
   return (& docker top $containerId -eo pid,args | Out-String)
 }
 
-function Set-FixtureMode([string]$version, [bool]$slow) {
+function Set-FixtureMode([string]$version, [bool]$slow, [bool]$slowHttpx = $false) {
   $env:KASE_FIXTURE_RECON_VERSION = $version
   $env:KASE_FIXTURE_SLOW_RECON = $slow.ToString().ToLowerInvariant()
+  $env:KASE_FIXTURE_SLOW_HTTPX = $slowHttpx.ToString().ToLowerInvariant()
   & docker compose up -d --force-recreate fixture
   if ($LASTEXITCODE -ne 0) { throw 'Could not recreate the fixture' }
   Wait-Until -Description 'fixture readiness' -Probe {
@@ -130,6 +131,8 @@ if (-not $env:KASE_LOCAL_KEK) {
 $env:KASE_SAST_RULE_PACK_SHA256 = Get-FileSha256 'rules/kase/typescript-security/idor/missing-ownership-predicate.yml'
 $env:KASE_FIXTURE_RECON_VERSION = '1'
 $env:KASE_FIXTURE_SLOW_RECON = 'false'
+$env:KASE_FIXTURE_SLOW_HTTPX = 'false'
+$env:KASE_FIXTURE_SLOW_MS = '30000'
 $env:KASE_JOB_LEASE_MS = '15000'
 $env:KASE_JOB_HEARTBEAT_MS = '3000'
 $env:KASE_SCHEDULER_RECOVERY_MS = '2000'
@@ -216,6 +219,16 @@ INSERT INTO "ApiToken" ("id", "projectId", "name", "tokenHash", "displayPrefix",
   $drift = Invoke-Psql "SELECT count(*) FILTER (WHERE `"kind`"='added' AND `"endpointKey`"='GET /api/reports/{id}') || '|' || count(*) FILTER (WHERE `"kind`"='removed' AND `"endpointKey`"='GET /recon-redirect') FROM `"EndpointDrift`" d JOIN `"EndpointInventory`" i ON i.`"id`"=d.`"inventoryId`" WHERE i.`"auditId`"='$($second.id)';"
   Assert-Equal $drift '1|1' 'Second fixture version did not produce added/removed endpoint drift'
 
+  Set-FixtureMode '3' $false
+  $changed = New-ReconAudit $projectId $targetId $repositoryId $commitSha $headers
+  Wait-AuditCompleted $changed.id
+  $changedDrift = Invoke-Psql "SELECT count(*) FROM `"EndpointDrift`" d JOIN `"EndpointInventory`" i ON i.`"id`"=d.`"inventoryId`" WHERE i.`"auditId`"='$($changed.id)' AND d.`"kind`"='changed' AND d.`"endpointKey`"='GET /recon-stable';"
+  Assert-Equal $changedDrift '1' 'A content-type change did not produce changed drift'
+  $unchanged = New-ReconAudit $projectId $targetId $repositoryId $commitSha $headers
+  Wait-AuditCompleted $unchanged.id
+  $unchangedDrift = Invoke-Psql "SELECT count(*) FROM `"EndpointDrift`" d JOIN `"EndpointInventory`" i ON i.`"id`"=d.`"inventoryId`" WHERE i.`"auditId`"='$($unchanged.id)' AND d.`"kind`"='changed' AND d.`"endpointKey`"='GET /recon-stable';"
+  Assert-Equal $unchangedDrift '0' 'Unchanged endpoint metadata unexpectedly produced drift'
+
   $concurrentA = New-ReconAudit $projectId $targetId $repositoryId $commitSha $headers
   $concurrentB = New-ReconAudit $projectId $targetId $repositoryId $commitSha $headers
   Wait-AuditCompleted $concurrentA.id 300
@@ -231,6 +244,22 @@ INSERT INTO "ApiToken" ("id", "projectId", "name", "tokenHash", "displayPrefix",
   if ($active -or $eventCount -ne 8) { throw "Expected four serialized network stages; observed $eventCount lease events" }
   $budgetSafe = Invoke-Psql "SELECT bool_and(`"consumed`" <= `"reconLimit`" AND `"reserved`"=0)::text FROM `"ReconRequestBudget`" WHERE `"auditId`" IN ('$($concurrentA.id)','$($concurrentB.id)');"
   Assert-Equal $budgetSafe 'true' 'Concurrent recon audits exceeded or leaked their request reservations'
+
+  Set-FixtureMode '2' $true
+  $recovered = New-ReconAudit $projectId $targetId $repositoryId $commitSha $headers
+  Wait-Until -Description 'live Katana process for worker recovery' -Seconds 180 -Probe {
+    $status = Invoke-Psql "SELECT `"status`" FROM `"AuditJob`" WHERE `"auditId`"='$($recovered.id)' AND `"kind`"='katana_discover';"
+    if ($status -in @('failed','timed_out','cancelled','succeeded')) { throw "Katana became $status before restart could be exercised" }
+    if ($status -eq 'running' -and (Get-ReconProcessList) -match '(^|\s)katana(\s|$)') { return $status }
+    return $null
+  } | Out-Null
+  & docker compose restart worker-recon
+  if ($LASTEXITCODE -ne 0) { throw 'Could not restart worker-recon during M3 recovery proof' }
+  Wait-AuditCompleted $recovered.id 360
+  $recoveryRows = Invoke-Psql "SELECT (SELECT `"attempts`" FROM `"AuditJob`" WHERE `"auditId`"='$($recovered.id)' AND `"kind`"='katana_discover') || '|' || (SELECT count(*) FROM `"Evidence`" WHERE `"auditId`"='$($recovered.id)' AND `"type`" IN ('crawl_result','recon_candidates','httpx_jsonl')) || '|' || (SELECT count(*) FROM `"ToolExecution`" WHERE `"auditJobId`" IN (SELECT `"id`" FROM `"AuditJob`" WHERE `"auditId`"='$($recovered.id)')) || '|' || (SELECT count(*) FROM `"EndpointInventory`" WHERE `"auditId`"='$($recovered.id)') || '|' || (SELECT count(*) FROM `"ReconRequestReservation`" r JOIN `"AuditJob`" j ON j.`"id`"=r.`"auditJobId`" WHERE j.`"auditId`"='$($recovered.id)' AND r.`"stage`"='katana');"
+  Assert-Equal $recoveryRows '2|3|3|1|1' 'Worker recovery duplicated M3 artifacts or request reservations'
+  $recoveryBudget = Invoke-Psql "SELECT `"reserved`" || '|' || `"consumed`" FROM `"ReconRequestBudget`" WHERE `"auditId`"='$($recovered.id)';"
+  if ($recoveryBudget -notmatch '^0\|[1-9][0-9]*$') { throw "Recovered audit did not settle its durable request budget: $recoveryBudget" }
 
   Set-FixtureMode '2' $true
   $cancelled = New-ReconAudit $projectId $targetId $repositoryId $commitSha $headers
@@ -252,11 +281,31 @@ INSERT INTO "ApiToken" ("id", "projectId", "name", "tokenHash", "displayPrefix",
   $cancelState = Invoke-Psql "SELECT count(*) FILTER (WHERE `"status`"='cancelled') || '|' || (SELECT count(*) FROM `"EndpointInventory`" WHERE `"auditId`"='$($cancelled.id)') || '|' || (SELECT count(*) FROM `"GateEvaluation`" WHERE `"auditId`"='$($cancelled.id)') || '|' || (SELECT count(*) FROM `"AuditEvent`" WHERE `"auditId`"='$($cancelled.id)' AND `"type`"='audit.cancel') FROM `"AuditJob`" WHERE `"auditId`"='$($cancelled.id)';"
   Assert-Equal $cancelState '5|0|0|1' 'Cancellation did not stop active work and cancel pending jobs exactly once'
 
+  Set-FixtureMode '2' $false $true
+  $httpxCancelled = New-ReconAudit $projectId $targetId $repositoryId $commitSha $headers
+  Wait-Until -Description 'live httpx process for cancellation' -Seconds 180 -Probe {
+    $status = Invoke-Psql "SELECT `"status`" FROM `"AuditJob`" WHERE `"auditId`"='$($httpxCancelled.id)' AND `"kind`"='httpx_verify';"
+    if ($status -in @('failed','timed_out','cancelled','succeeded')) { throw "httpx became $status before cancellation could be exercised" }
+    if ($status -eq 'running' -and (Get-ReconProcessList) -match '(^|\s)httpx(\s|$)') { return $status }
+    return $null
+  } | Out-Null
+  Invoke-Kase 'Post' "audits/$($httpxCancelled.id)/cancel" $headers | Out-Null
+  Wait-Until -Description 'cancelled httpx audit' -Seconds 120 -Probe {
+    $status = Invoke-Psql "SELECT `"status`" FROM `"Audit`" WHERE `"id`"='$($httpxCancelled.id)';"
+    if ($status -in @('completed','partial','failed')) { throw "Cancelled httpx audit ended as $status" }
+    if ($status -eq 'cancelled') { return $status }
+    return $null
+  } | Out-Null
+  Start-Sleep -Seconds 2
+  if ((Get-ReconProcessList) -match '(^|\s)httpx(\s|$)') { throw 'Cancellation left httpx running' }
+  $httpxCancelState = Invoke-Psql "SELECT count(*) FILTER (WHERE `"status`"='cancelled') || '|' || count(*) FILTER (WHERE `"status`"='succeeded') || '|' || (SELECT count(*) FROM `"Evidence`" WHERE `"auditId`"='$($httpxCancelled.id)' AND `"type`" IN ('crawl_result','recon_candidates')) || '|' || (SELECT count(*) FROM `"Evidence`" WHERE `"auditId`"='$($httpxCancelled.id)' AND `"type`"='httpx_jsonl') FROM `"AuditJob`" WHERE `"auditId`"='$($httpxCancelled.id)';"
+  Assert-Equal $httpxCancelState '3|3|2|0' 'httpx cancellation did not preserve earlier artifacts and cancel only downstream work'
+
   $running = & docker compose ps --status running --services
   foreach ($service in @('postgres','redis','minio','fixture','recon-trap','egress-proxy','api','scheduler','worker-recon','worker-sast','worker-retention')) {
     if ($running -notcontains $service) { throw "Retained M3 service is not running: $service" }
   }
-  Write-Host "M3 recon proof passed: audit=$($first.id), crawlSha=$crawlSha, httpxSha=$httpxSha, driftAudit=$($second.id), cancelledAudit=$($cancelled.id)"
+  Write-Host "M3 recon proof passed: audit=$($first.id), crawlSha=$crawlSha, httpxSha=$httpxSha, driftAudit=$($second.id), recoveredAudit=$($recovered.id), cancelledAudit=$($cancelled.id), httpxCancelledAudit=$($httpxCancelled.id)"
   & docker compose ps
 } catch {
   Write-Host "M3 proof failure: $($_.Exception.Message)" -ForegroundColor Red

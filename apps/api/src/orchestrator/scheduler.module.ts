@@ -4,9 +4,10 @@ import { AuditSchedulerService } from './audit-scheduler.service';
 import { SchedulerWorkerService } from './scheduler-worker.service';
 import { PrismaModule } from '../prisma/prisma.module';
 import { QueueModule } from '../queue/queue.module';
+import { ReconBudgetService } from '../recon/recon-budget.service';
 
 @Module({
   imports: [PrismaModule, QueueModule, AuditEventsModule],
-  providers: [AuditSchedulerService, SchedulerWorkerService],
+  providers: [ReconBudgetService, AuditSchedulerService, SchedulerWorkerService],
 })
 export class SchedulerModule {}

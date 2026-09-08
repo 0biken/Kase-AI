@@ -51,15 +51,15 @@ volumes:
   } finally { Pop-Location }
 
   $constraints = docker compose -f $composeFile -p $projectName exec -T postgres psql -U kase -d kase -Atc 'SELECT conname FROM pg_constraint ORDER BY conname'
-  foreach ($name in @('ReconRequestBudget_nonnegative_check','EndpointInventory_counts_check','EndpointInventory_status_check','EndpointDrift_kind_check','ReconRequestBudget_auditId_fkey','EndpointInventory_auditId_fkey','EndpointInventory_projectId_fkey','EndpointInventory_targetId_fkey','EndpointInventory_previousInventoryId_fkey','EndpointDrift_inventoryId_fkey')) {
+  foreach ($name in @('ReconRequestBudget_nonnegative_check','ReconRequestReservation_counts_check','ReconRequestReservation_status_check','EndpointInventory_counts_check','EndpointInventory_status_check','EndpointDrift_kind_check','ReconRequestBudget_auditId_fkey','ReconRequestReservation_auditId_fkey','ReconRequestReservation_auditJobId_fkey','EndpointInventory_auditId_fkey','EndpointInventory_projectId_fkey','EndpointInventory_targetId_fkey','EndpointInventory_previousInventoryId_fkey','EndpointDrift_inventoryId_fkey')) {
     if ($constraints -notcontains $name) { throw "Missing M3 constraint: $name" }
   }
   $indexes = docker compose -f $composeFile -p $projectName exec -T postgres psql -U kase -d kase -Atc 'SELECT indexname FROM pg_indexes WHERE schemaname = ''public'' ORDER BY indexname'
-  foreach ($name in @('EndpointInventory_auditId_key','EndpointInventory_projectId_targetId_generatedAt_idx','Endpoint_inventoryId_method_pathTemplate_key','EndpointDrift_inventoryId_endpointKey_kind_key')) {
+  foreach ($name in @('ReconRequestReservation_auditJobId_stage_key','ReconRequestReservation_auditId_status_leaseExpiresAt_idx','EndpointInventory_auditId_key','EndpointInventory_projectId_targetId_generatedAt_idx','Endpoint_inventoryId_method_pathTemplate_key','EndpointDrift_inventoryId_endpointKey_kind_key')) {
     if ($indexes -notcontains $name) { throw "Missing M3 index: $name" }
   }
-  $timestampTypes = docker compose -f $composeFile -p $projectName exec -T postgres psql -U kase -d kase -Atc "SELECT table_name || '.' || column_name || '=' || data_type FROM information_schema.columns WHERE (table_name,column_name) IN (('EndpointInventory','generatedAt'),('EndpointDrift','createdAt'),('ReconRequestBudget','updatedAt')) ORDER BY 1"
-  if (($timestampTypes | Where-Object { $_ -notmatch '=timestamp with time zone$' }).Count -gt 0 -or $timestampTypes.Count -ne 3) { throw "Unexpected M3 timestamp types: $($timestampTypes -join ', ')" }
+  $timestampTypes = docker compose -f $composeFile -p $projectName exec -T postgres psql -U kase -d kase -Atc "SELECT table_name || '.' || column_name || '=' || data_type FROM information_schema.columns WHERE (table_name,column_name) IN (('EndpointInventory','generatedAt'),('EndpointDrift','createdAt'),('ReconRequestBudget','updatedAt'),('ReconRequestReservation','leaseExpiresAt'),('ReconRequestReservation','createdAt'),('ReconRequestReservation','updatedAt')) ORDER BY 1"
+  if (($timestampTypes | Where-Object { $_ -notmatch '=timestamp with time zone$' }).Count -gt 0 -or $timestampTypes.Count -ne 6) { throw "Unexpected M3 timestamp types: $($timestampTypes -join ', ')" }
   $requiredEndpointColumns = docker compose -f $composeFile -p $projectName exec -T postgres psql -U kase -d kase -Atc "SELECT column_name || '=' || is_nullable FROM information_schema.columns WHERE table_name='Endpoint' AND column_name IN ('rawExamples','discoveredBy','statusObserved','parameters','technologies') ORDER BY column_name"
   if ($requiredEndpointColumns.Count -ne 5 -or ($requiredEndpointColumns | Where-Object { $_ -notmatch '=NO$' }).Count -gt 0) { throw "M3 Endpoint collection columns are unexpectedly nullable: $($requiredEndpointColumns -join ', ')" }
   Write-Output 'KASE_M3_MIGRATIONS_VERIFIED'

@@ -67,7 +67,7 @@ const countedTaskText = `${tasks.slice(0, deferredStart)}${tasks.slice(invariant
 const taskBoxes = [...countedTaskText.matchAll(/^\s*- \[([ x~])\]/gm)];
 const doneBoxes = taskBoxes.filter((match) => match[1] === 'x');
 if (taskBoxes.length !== 130) throw new Error(`TASKS.md contains ${taskBoxes.length} tasks, expected 130`);
-if (doneBoxes.length !== 48) throw new Error(`TASKS.md contains ${doneBoxes.length} completed tasks, expected 48`);
+if (doneBoxes.length !== 57) throw new Error(`TASKS.md contains ${doneBoxes.length} completed tasks, expected 57`);
 
 const phase0 = tasks.slice(tasks.indexOf('## Phase 0'), tasks.indexOf('## M1'));
 const phase0Boxes = [...phase0.matchAll(/^\s*- \[([ x~])\]/gm)];
@@ -81,6 +81,12 @@ if (m2Boxes.length !== 18 || m2Boxes.filter((match) => match[1] === 'x').length 
   throw new Error('M2 task counts are not 18 of 18');
 }
 
+const m3 = tasks.slice(tasks.indexOf('## M3'), tasks.indexOf('## M4'));
+const m3Boxes = [...m3.matchAll(/^\s*- \[([ x~])\]/gm)];
+if (m3Boxes.length !== 9 || m3Boxes.filter((match) => match[1] === 'x').length !== 9) {
+  throw new Error('M3 task counts are not 9 of 9');
+}
+
 requireText(adr, '## ADR-015 — Ship Kase rules, never Semgrep Registry rules', 'ADR catalog');
 requireText(adr, '## ADR-016 — Bounded retention and mandatory capture-time redaction', 'ADR catalog');
 requireText(adr, 'This is a product architecture decision based on published upstream terms, not a substitute for external legal advice.', 'ADR-015 legal boundary');
@@ -88,7 +94,7 @@ requireText(roadmap, 'Closed — LGPL engine with notices', 'roadmap licensing c
 requireText(roadmap, 'Closed — 90/30/30/30 defaults', 'roadmap retention closeout');
 requireText(readme, 'the LLM provider contract is the only remaining Phase 0 item', 'README delivery status');
 requireText(roadmap, 'M2 is complete.', 'roadmap M2 closeout');
-requireText(readme, 'M1 and M2 are implemented and verified', 'README M2 closeout');
+requireText(readme, 'M1 through M3 are implemented and verified', 'README M3 closeout');
 
 runVerifier('scripts/verify-semgrep-decision.mjs', ['--self-test'], 'SEMGREP_DECISION_VERIFIED');
 runVerifier('scripts/verify-semgrep-decision.mjs', ['--contracts'], 'SEMGREP_CONTRACTS_VERIFIED');

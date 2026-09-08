@@ -15,7 +15,7 @@ describe('orchestrator durable scheduler', () => {
     };
     const prisma: any = { $transaction: jest.fn((fn) => fn(tx)), auditJob: { update: jest.fn() } };
     const queues = { enqueue: jest.fn() };
-    const scheduler = new AuditSchedulerService(prisma, queues as never);
+    const scheduler = new AuditSchedulerService(prisma, queues as never, { reclaimExpired: jest.fn() } as never);
     await scheduler.advance('aud');
     expect(queues.enqueue).toHaveBeenCalledWith('semgrep', {
       auditId: 'aud', auditJobId: 'sast', projectId: 'prj',
@@ -55,10 +55,12 @@ describe('orchestrator durable scheduler', () => {
       },
       audit: { findMany: jest.fn().mockResolvedValue([{ id: 'a1' }, { id: 'a2' }]) },
     };
-    const scheduler = new AuditSchedulerService(prisma, {} as never);
+    const budgets = { reclaimExpired: jest.fn().mockResolvedValue(1) };
+    const scheduler = new AuditSchedulerService(prisma, {} as never, budgets as never);
     jest.spyOn(scheduler, 'advance').mockResolvedValue();
     const now = new Date('2026-01-01T00:00:00Z');
     await scheduler.recover(now);
+    expect(budgets.reclaimExpired).toHaveBeenCalledWith(now);
     expect(prisma.auditJob.updateMany).toHaveBeenNthCalledWith(1, expect.objectContaining({
       where: { id: 'retry', status: 'running', leaseExpiresAt: { lt: now } },
       data: expect.objectContaining({ status: 'queued', leaseExpiresAt: null }),

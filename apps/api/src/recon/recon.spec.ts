@@ -56,4 +56,12 @@ describe('M3 recon contracts', () => {
       expect(metadataFingerprint({ ...baseline, ...change })).not.toBe(metadataFingerprint(baseline));
     }
   });
+
+  it('requires a completed predecessor that predates the current audit for inventory history', () => {
+    const source = require('fs').readFileSync(require('path').join(__dirname, 'inventory.service.ts'), 'utf8');
+    expect(source).toContain("status: { in: ['completed', 'partial'] }");
+    expect(source).toContain('completedAt: { lte: audit.startedAt }');
+    expect(source).toContain('SELECT id FROM "Target" WHERE id = $1 FOR UPDATE');
+    expect(source).toContain('update: { status: \'building\', generatedAt: null }');
+  });
 });
