@@ -26,6 +26,19 @@ describe('orchestrator durable job graph', () => {
     expect(graphTemplate('full', ['http']).find((job) => job.kind === 'scope_filter')).toMatchObject({ maxRetries: 0, timeoutMs: 120_000 });
   });
 
+  it('keeps deterministic defaults AI-free and expands explicit agent choices with prerequisites', () => {
+    expect(graphTemplate('full').map((job) => job.kind)).not.toContain('blackbox_agent');
+    expect(graphTemplate('full').map((job) => job.kind)).not.toContain('whitebox_agent');
+    expect(graphTemplate('full', ['blackbox']).map((job) => job.kind)).toEqual([
+      'build_provenance', 'katana_discover', 'scope_filter', 'httpx_verify',
+      'inventory_merge', 'inventory_drift', 'blackbox_agent',
+    ]);
+    expect(graphTemplate('full', ['blackbox']).at(-1)).toMatchObject({ dependsOnKinds: ['inventory_drift'] });
+    expect(graphTemplate('security', ['whitebox']).map((job) => job.kind)).toEqual([
+      'build_provenance', 'semgrep', 'code_map', 'whitebox_agent', 'normalize_severity',
+    ]);
+  });
+
   it('selects at most four ready jobs after dependencies terminally settle', () => {
     const root = { id: 'root', kind: 'build_provenance', dependsOn: [], status: 'succeeded' as const };
     const children = Array.from({ length: 6 }, (_, i) => ({

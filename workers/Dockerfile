@@ -26,7 +26,9 @@ COPY --from=builder --chown=10001:10001 /workspace/apps/api/node_modules ./apps/
 COPY --from=builder --chown=10001:10001 /workspace/apps/api/dist ./apps/api/dist
 COPY --from=builder --chown=10001:10001 /workspace/apps/api/package.json ./apps/api/package.json
 COPY --from=builder --chown=10001:10001 /workspace/packages/db ./packages/db
+COPY --from=builder --chown=10001:10001 /workspace/methodology ./methodology
 ENV NODE_ENV=production \
+    KASE_METHODOLOGY_ROOT=/workspace/methodology/v1 \
     KASE_SECRET_TMPFS=/run/kase-secrets \
     KASE_CURL_VERSION=7.88.1
 USER 10001:10001
@@ -79,6 +81,7 @@ ENV KASE_WORKER_FAMILY=deps
 
 FROM worker-base AS worker-agent
 ENV KASE_WORKER_FAMILY=agent
+CMD ["node", "apps/api/dist/agent-worker-main.js"]
 
 FROM worker-base AS api
 USER 10001:10001

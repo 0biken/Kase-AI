@@ -23,7 +23,7 @@ describe('offline Semgrep adapter and Kase normalization', () => {
   it('verifies local pack digest and invokes Semgrep without network/registry configuration', async () => {
     const pack = join(root, 'pack.yml'); await writeFile(pack, 'rules: []');
     const sha = createHash('sha256').update('rules: []').digest('hex');
-    const execute = jest.fn(async () => ({ exitCode: 0, stderr: '', stdout: JSON.stringify({ results: [] }) }));
+    const execute = jest.fn(async (...args: any[]) => ({ exitCode: 0, stderr: '', stdout: JSON.stringify({ results: [] }) }));
     await new SemgrepAdapter(execute).run({ checkoutPath: root, rulePackPath: pack, rulePackSha256: sha });
     const [args, options] = execute.mock.calls[0];
     expect(args).toContain(pack); expect(args.join(' ')).not.toMatch(/https?:|p\//);

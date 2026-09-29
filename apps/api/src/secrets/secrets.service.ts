@@ -113,10 +113,10 @@ export class SecretsService {
   }
 
   /** Internal worker-only lease. It is never exposed by a controller. */
-  async resolveForWorker(projectId: string, secretId: string): Promise<string> {
+  async resolveForWorker(projectId: string, secretId: string, frozenVersion?: number): Promise<string> {
     const secret = await this.prisma.secret.findFirst({
       where: { id: secretId, projectId, revokedAt: null },
-      include: { versions: { orderBy: { version: 'desc' }, take: 1 } },
+      include: { versions: { ...(frozenVersion === undefined ? {} : { where: { version: frozenVersion } }), orderBy: { version: 'desc' }, take: 1 } },
     });
     if (!secret || secret.versions.length !== 1) {
       throw new ProblemException('NOT_FOUND', 'Credential is missing or revoked');

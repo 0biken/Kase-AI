@@ -6,6 +6,8 @@ export const SECRET_KINDS = [
   'target_cookie',
   'oauth_client',
   'provider_api_key',
+  'anthropic_api_key',
+  'openai_api_key',
 ] as const;
 
 export class CreateSecretDto {

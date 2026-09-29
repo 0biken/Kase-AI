@@ -8,6 +8,7 @@ import { RetentionWorkerModule } from '../retention/retention-worker.module';
 import { SchedulerWorkerService } from '../orchestrator/scheduler-worker.service';
 import { ReconWorkerService } from './recon-worker.service';
 import { ReconPipelineConsumerService } from './recon-pipeline-consumer.service';
+import { HttpJobConsumerService } from './http-job-consumer.service';
 import { SastJobConsumerService } from './sast-job-consumer.service';
 import { RetentionRunnerService } from '../retention/retention-runner.service';
 
@@ -27,7 +28,9 @@ describe('runtime composition roots', () => {
   });
 
   it('assigns recon/http, SAST, and retention consumers to distinct roots', () => {
-    expect(metadata(WorkerModule, MODULE_METADATA.PROVIDERS)).toEqual(expect.arrayContaining([ReconWorkerService, ReconPipelineConsumerService]));
+    expect(metadata(WorkerModule, MODULE_METADATA.PROVIDERS)).toEqual(expect.arrayContaining([
+      ReconWorkerService, ReconPipelineConsumerService, HttpJobConsumerService,
+    ]));
     expect(metadata(SastWorkerModule, MODULE_METADATA.PROVIDERS)).toContain(SastJobConsumerService);
     expect(metadata(RetentionWorkerModule, MODULE_METADATA.PROVIDERS)).toContain(RetentionRunnerService);
   });

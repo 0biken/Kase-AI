@@ -1,0 +1,4 @@
+# Agent Egress Allowlist
+# Replace this reserved, non-routable destination with verified Agent Router
+# hostnames when G6 resumes. Direct provider hosts are never fallback routes.
+router.invalid

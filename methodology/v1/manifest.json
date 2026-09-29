@@ -1,0 +1,17 @@
+{
+  "version": "1.0.0",
+  "archiveDigests": {
+    "qa-audit.skill": "4bdd26f4a80c1caa8702ca6140488057c75b98c8e969a0edf23144d2d6186869",
+    "qa-audit-whitebox.skill": "5e88a25a47f50c5a61200d2327a98cb411bc8287e0e99929c2213a3f8fbacead"
+  },
+  "referenceFiles": {
+    "blackbox/finding-format.md": "230ab23c533680f7633ae463c968040a26f569d87f32994498fc44a782085a71",
+    "blackbox/report-structure.md": "b8e75a4854828a0235d3fa9add8f0bbb680bfa05128c9b404eb4b0e7450d2e3a",
+    "blackbox/test-categories.md": "21a2b0609f29009a3bda37271dde619d735212a1f7fd48668e54b7be59dcd4b9",
+    "whitebox/finding-format-whitebox.md": "c0426ff8d6a55d558111904852592242a540ba239ef44a849c2f3c5e579df7d2",
+    "whitebox/report-structure-whitebox.md": "bb5ff46844e1f94fffaa732fd0e7d6f672e68bae1dac39ffcde4dd3d197bdd0f",
+    "whitebox/whitebox-categories.md": "b70adb07ba8451539f609535ad0e7eb3a0087d39148462e5fece25df3a2efe60"
+  },
+  "upstreamSkillVersion": "1.0.0",
+  "kasePromptVersion": "m4-1.0.0"
+}

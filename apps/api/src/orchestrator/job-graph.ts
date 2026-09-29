@@ -1,6 +1,7 @@
 export const JOB_STATUSES = [
   'queued',
   'running',
+  'waiting',
   'succeeded',
   'failed',
   'skipped',
@@ -102,7 +103,8 @@ export function blockedJobs(nodes: readonly JobGraphNode[]): JobGraphNode[] {
 
 export interface JobTemplate {
   kind: 'build_provenance' | 'semgrep' | 'normalize_severity' | 'recon' |
-    'katana_discover' | 'scope_filter' | 'httpx_verify' | 'inventory_merge' | 'inventory_drift';
+    'katana_discover' | 'scope_filter' | 'httpx_verify' | 'inventory_merge' | 'inventory_drift' |
+    'code_map' | 'blackbox_agent' | 'whitebox_agent';
   category: string | null;
   dependsOnKinds: readonly JobTemplate['kind'][];
   timeoutMs: number;
@@ -120,11 +122,14 @@ export const ADAPTER_TIMEOUTS_MS = {
   httpx_verify: 5 * 60_000,
   inventory_merge: 2 * 60_000,
   inventory_drift: 2 * 60_000,
+  code_map: 10 * 60_000,
+  blackbox_agent: 45 * 60_000,
+  whitebox_agent: 35 * 60_000,
 } as const;
 
 export function graphTemplate(
   mode: 'smoke' | 'security' | 'full',
-  categories?: readonly ('sast' | 'http')[],
+  categories?: readonly ('sast' | 'http' | 'blackbox' | 'whitebox')[],
 ): JobTemplate[] {
   if (mode === 'smoke') {
     return [{
@@ -132,7 +137,9 @@ export function graphTemplate(
       timeoutMs: ADAPTER_TIMEOUTS_MS.recon, maxRetries: 2, required: true,
     }];
   }
-  const selected = categories ?? (mode === 'full' ? ['sast', 'http'] : ['sast']);
+  const selected = [...(categories ?? (mode === 'full' ? ['sast', 'http'] : ['sast']))];
+  if (selected.includes('blackbox') && !selected.includes('http')) selected.push('http');
+  if (selected.includes('whitebox') && !selected.includes('sast')) selected.push('sast');
   const jobs: JobTemplate[] = [
     {
       kind: 'build_provenance', category: null, dependsOnKinds: [],
@@ -154,6 +161,26 @@ export function graphTemplate(
       { kind: 'inventory_drift', category: 'http', dependsOnKinds: ['inventory_merge'], timeoutMs: ADAPTER_TIMEOUTS_MS.inventory_drift, maxRetries: 2, required: true },
     );
   }
+  if (selected.includes('whitebox')) {
+    jobs.push({
+      kind: 'code_map', category: null, dependsOnKinds: ['build_provenance'],
+      timeoutMs: ADAPTER_TIMEOUTS_MS.code_map, maxRetries: 2, required: true,
+    });
+  }
+
+  if (selected.includes('blackbox')) {
+    jobs.push({
+      kind: 'blackbox_agent', category: 'blackbox', dependsOnKinds: ['inventory_drift'],
+      timeoutMs: ADAPTER_TIMEOUTS_MS.blackbox_agent, maxRetries: 1, required: true,
+    });
+  }
+  if (selected.includes('whitebox')) {
+    jobs.push({
+      kind: 'whitebox_agent', category: 'whitebox', dependsOnKinds: ['semgrep', 'code_map'],
+      timeoutMs: ADAPTER_TIMEOUTS_MS.whitebox_agent, maxRetries: 1, required: true,
+    });
+  }
+
   if (selected.includes('sast')) {
     jobs.push({
       kind: 'normalize_severity', category: null, dependsOnKinds: ['semgrep'],

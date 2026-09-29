@@ -3,6 +3,29 @@ import { AuditJobLifecycleService } from './audit-job-lifecycle.service';
 describe('AuditJobLifecycleService', () => {
   const payload = { auditId: 'aud_1', auditJobId: 'job_1', projectId: 'prj_1' };
 
+  it('keeps lease generations monotonic across child suspensions', async () => {
+    const tx: any = { $queryRawUnsafe: jest.fn(), auditJob: {
+      findFirst: jest.fn().mockResolvedValue({ id: 'child' }),
+      updateMany: jest.fn().mockResolvedValue({ count: 1 }),
+    } };
+    const db: any = { $transaction: async fn => fn(tx) };
+    const lifecycle = new AuditJobLifecycleService(db, { wakeScheduler: jest.fn() } as any, {} as any);
+    await lifecycle.waitForChild(payload, 'child', 7);
+    const update = tx.auditJob.updateMany.mock.calls[0][0];
+    expect(update.where.attempts).toBe(7);
+    expect(update.data).toMatchObject({ status: 'waiting', continuations: { increment: 1 } });
+    expect(update.data).not.toHaveProperty('attempts');
+  });
+
+  it('does not spend the failure retry allowance on successful continuations', async () => {
+    const db: any = {
+      auditJob: { findFirst: async () => ({ id: 'job_1', status: 'running', attempts: 8, continuations: 7, maxRetries: 1, timeoutMs: 60000 }), updateMany: jest.fn().mockResolvedValue({ count: 0 }) },
+    };
+    const lifecycle = new AuditJobLifecycleService(db, {} as any, {} as any);
+    await lifecycle.fail(payload, new Error('temporary transport failure'), 8);
+    expect(db.auditJob.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'job_1', status: 'running', attempts: 8 }, data: expect.objectContaining({ status: 'queued' }) }));
+  });
+
   it('does not execute an adapter again when a stale queue delivery finds a succeeded job', async () => {
     const tx = {
       $queryRawUnsafe: jest.fn(),

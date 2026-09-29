@@ -30,6 +30,6 @@ export class InvoiceController {
 
   @Get()
   async list(@Req() req: any) {
-    return { ownerId: req.userId };
+    return this.invoiceService.listByOwner(req.userId);
   }
 }

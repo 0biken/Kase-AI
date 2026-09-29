@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
+import { AiConfigurationService } from '../agent-runtime/ai-configuration.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { ProblemException } from '../common/problem-details';
 import { isHostAllowed } from '../common/host-pattern';
@@ -15,6 +16,7 @@ export class OrchestratorService {
     private readonly prisma: PrismaService,
     private readonly trail: AuditTrailService,
     private readonly queues: DurableQueueDispatcher,
+    @Optional() private readonly aiConfigurations?: AiConfigurationService,
   ) {}
 
   list(projectId: string) {
@@ -52,7 +54,7 @@ export class OrchestratorService {
     const requestedCategories = dto.mode === 'smoke'
       ? [dto.category ?? dto.categories?.[0] ?? 'fixture_health']
       : [...new Set(dto.categories?.length ? dto.categories : dto.mode === 'full' ? ['sast', 'http'] : ['sast'])];
-    const allowedCategories = dto.mode === 'smoke' ? ['fixture_health'] : dto.mode === 'security' ? ['sast'] : ['sast', 'http'];
+    const allowedCategories = dto.mode === 'smoke' ? ['fixture_health'] : dto.mode === 'security' ? ['sast'] : ['sast', 'http', 'blackbox', 'whitebox'];
     const unsupported = requestedCategories.filter((category) => !allowedCategories.includes(category));
     if (unsupported.length > 0) {
       throw new ProblemException('VALIDATION_FAILED', `Unsupported ${dto.mode} categories: ${unsupported.join(', ')}`);
@@ -66,7 +68,7 @@ export class OrchestratorService {
     if (dto.mode !== 'smoke' && !dto.repositoryId) {
       throw new ProblemException('VALIDATION_FAILED', 'Security audits require repositoryId');
     }
-    if (requestedCategories.includes('http') && !dto.targetId) {
+    if ((requestedCategories.includes('http') || requestedCategories.includes('blackbox')) && !dto.targetId) {
       throw new ProblemException('VALIDATION_FAILED', 'Full audits require targetId for the HTTP category');
     }
 
@@ -108,10 +110,17 @@ export class OrchestratorService {
       }
     }
 
+    const aiRequested = requestedCategories.includes('blackbox') || requestedCategories.includes('whitebox');
+    let aiConfig: any = null;
+    if (aiRequested) {
+      if (!this.aiConfigurations) throw new ProblemException('INTERNAL', 'AI configuration service unavailable');
+      aiConfig = await this.aiConfigurations.snapshot(projectId);
+    }
+
     const auditId = newId('audit');
     const templates = graphTemplate(
       dto.mode,
-      dto.mode === 'smoke' ? undefined : requestedCategories as Array<'sast' | 'http'>,
+      dto.mode === 'smoke' ? undefined : requestedCategories as Array<'sast' | 'http' | 'blackbox' | 'whitebox'>,
     );
     const jobIds = new Map(templates.map((template) => [template.kind, newId('auditJob')]));
     const audit = await this.prisma.$transaction(async (tx) => {
@@ -131,13 +140,30 @@ export class OrchestratorService {
           notExecutedCategories: [],
         },
       });
-      if (requestedCategories.includes('http') && policy) {
+      if ((requestedCategories.includes('http') || requestedCategories.includes('blackbox')) && policy) {
         await tx.reconRequestBudget.create({ data: {
           auditId,
           maxRequests: policy.maxRequestsPerAudit,
           reconLimit: Math.max(1, Math.floor(policy.maxRequestsPerAudit * 0.4)),
         } });
       }
+      if (aiRequested && aiConfig) {
+        await tx.auditAiSnapshot.create({
+          data: {
+            auditId,
+            ...aiConfig,
+          },
+        });
+        await tx.auditAiBudget.create({
+          data: {
+            auditId,
+            totalTokensLimit: aiConfig.budgetTotalTokens,
+            totalCallsLimit: aiConfig.budgetMaxCalls,
+            contextBytesLimit: aiConfig.budgetMaxContextBytes,
+          },
+        });
+      }
+
       for (const template of templates) {
         await tx.auditJob.create({ data: {
           id: jobIds.get(template.kind)!, auditId, kind: template.kind,

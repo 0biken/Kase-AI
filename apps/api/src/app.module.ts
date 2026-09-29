@@ -16,6 +16,7 @@ import { SecretsModule } from './secrets/secrets.module';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { FindingsModule } from './findings/findings.module';
 import { ReconModule } from './recon/recon.module';
+import { AgentRuntimeModule } from './agent-runtime/agent-runtime.module';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { ReconModule } from './recon/recon.module';
     TokensModule,
     SecretsModule,
     OrganizationsModule,
+    AgentRuntimeModule,
   ],
   controllers: [AppController],
   providers: [AppService],

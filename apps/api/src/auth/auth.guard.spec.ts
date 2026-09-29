@@ -24,7 +24,7 @@ describe('AuthGuard', () => {
   let guard: AuthGuard;
 
   let publicKeyPem: string;
-  let privateKey: CryptoKey;
+  let privateKey: any;
   let userId: string;
   let orgId: string;
 

@@ -57,6 +57,17 @@ export class AuditJobLifecycleService {
     return result.count === 1;
   }
 
+  async waitForChild(payload: ReconAuditJobPayload, childJobId: string, attempt: number): Promise<void> {
+    await this.prisma.$transaction(async tx => {
+      await lockAudit(tx, payload.auditId);
+      const child = await tx.auditJob.findFirst({ where: { id: childJobId, auditId: payload.auditId, parentJobId: payload.auditJobId } });
+      if (!child) throw new Error('Child does not belong to agent job');
+      await tx.auditJob.updateMany({ where: { id: payload.auditJobId, auditId: payload.auditId, status: 'running', attempts: attempt },
+        data: { status: 'waiting', continuations: { increment: 1 }, heartbeatAt: null, leaseExpiresAt: null, enqueuedAt: null } });
+    });
+    await this.queues.wakeScheduler(payload);
+  }
+
   async succeed(payload: ReconAuditJobPayload, attempt?: number): Promise<void> {
     const changed = await this.prisma.auditJob.updateMany({
       where: { id: payload.auditJobId, auditId: payload.auditId, status: 'running', ...(attempt === undefined ? {} : { attempts: attempt }) },
@@ -77,7 +88,9 @@ export class AuditJobLifecycleService {
     const job = await this.prisma.auditJob.findFirst({ where: { id: payload.auditJobId, auditId: payload.auditId, ...(attempt === undefined ? {} : { attempts: attempt }) } });
     if (!job || job.status !== 'running') return;
     const errorClass = classifyJobError(error);
-    const decision = retryDecision(errorClass, job.attempts, job.maxRetries, job.timeoutMs);
+    // Lease generations never decrease. Successful child suspensions do not
+    // consume the failure retry allowance.
+    const decision = retryDecision(errorClass, job.attempts - (job.continuations ?? 0), job.maxRetries, job.timeoutMs);
     // A recovered job may have been claimed for a newer attempt after the
     // stale worker read it.  Make the terminal/retry write conditional too;
     // otherwise that stale worker could overwrite the current attempt.

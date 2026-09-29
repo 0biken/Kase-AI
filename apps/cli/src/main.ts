@@ -28,6 +28,13 @@ async function startAudit(client: KaseClient, args: string[], io: Io): Promise<n
   }}).values;
   if (!parsed.project || !parsed.target) throw new Error('--project and --target are required');
   if (!['smoke', 'security', 'full'].includes(parsed.mode!)) throw new Error('--mode must be smoke, security, or full');
+  // Valid categories: sast, http, blackbox, whitebox (M4)
+  const validCategories = ['sast', 'http', 'blackbox', 'whitebox'];
+  if (parsed.categories) {
+    const cats = parsed.categories.split(',').filter(Boolean);
+    const invalid = cats.filter(c => !validCategories.includes(c));
+    if (invalid.length) throw new Error(`Invalid categories: ${invalid.join(', ')}. Valid: ${validCategories.join(', ')}`);
+  }
   const projectId = await resolveProject(client, parsed.project);
   const targetId = await resolveNamed(await client.listTargets(projectId), parsed.target, 'tgt', ['id', 'name'], 'target');
   const repositories = await client.listRepositories(projectId);

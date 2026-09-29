@@ -14,6 +14,7 @@ interface StoredJob extends JobGraphNode {
   auditId: string;
   category?: string | null;
   attempts: number;
+  continuations?: number;
   maxRetries: number;
   timeoutMs: number;
   required?: boolean;
@@ -35,14 +36,22 @@ export class AuditSchedulerService {
       const audit = await tx.audit.findUnique({ where: { id: auditId } });
       if (!audit || isTerminalAuditStatus(audit.status)) return [];
       const jobs: StoredJob[] = await tx.auditJob.findMany({ where: { auditId }, orderBy: { id: 'asc' } });
+      for (const job of jobs.filter(j => j.status === 'waiting')) {
+        const run = await tx.agentRun.findFirst({ where: { auditJobId: job.id, auditId } });
+        const child = jobs.find(j => j.id === run?.waitingForJobId);
+        if (!child || TERMINAL_JOB_STATUSES.includes(child.status) || (run?.deadline && run.deadline <= new Date())) {
+          await tx.auditJob.update({ where: { id: job.id }, data: { status: 'queued', enqueuedAt: null } });
+          job.status = 'queued';
+        }
+      }
       if (audit.cancellationRequestedAt) {
         await tx.auditJob.updateMany({
-          where: { auditId, status: 'queued' },
+          where: { auditId, status: { in: ['queued', 'waiting'] } },
           data: { status: 'cancelled', finishedAt: new Date(), enqueuedAt: null, errorClass: 'cancelled' },
         });
         const remaining = jobs.filter((job) => job.status === 'running');
         if (remaining.length === 0) {
-          const cancelledJobs = jobs.map((job) => job.status === 'queued' ? { ...job, status: 'cancelled' as const } : job);
+          const cancelledJobs = jobs.map((job) => ['queued', 'waiting'].includes(job.status) ? { ...job, status: 'cancelled' as const } : job);
           await this.finishSettledGraph(tx, audit, cancelledJobs);
         }
         return [];
@@ -103,7 +112,7 @@ export class AuditSchedulerService {
       orderBy: { id: 'asc' },
     });
     for (const job of expired) {
-      const retry = job.attempts <= job.maxRetries;
+      const retry = job.attempts - (job.continuations ?? 0) <= job.maxRetries;
       await (this.prisma.auditJob as any).updateMany({
         where: { id: job.id, status: 'running', leaseExpiresAt: { lt: now } },
         data: retry ? {
@@ -127,7 +136,7 @@ export class AuditSchedulerService {
 
   private async finishSettledGraph(tx: any, audit: any, jobs: StoredJob[]): Promise<void> {
     const failed = jobs.filter((job) => ['failed', 'timed_out'].includes(job.status));
-    const reasons = [...new Set([...(audit.degradationReasons ?? []),
+    const reasons = [...new Set([...(audit.degradationReasons ?? []), ...(audit.degraded ? ['audit_degraded'] : []),
       ...failed.map((job) => job.status === 'timed_out' ? 'job_timeout' : 'job_exhausted')])];
     const status = completionStatus({
       setupFailed: failed.some((job) => job.kind === 'build_provenance'),

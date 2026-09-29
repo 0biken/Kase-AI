@@ -27,7 +27,7 @@ describe('orchestrator cancellation', () => {
   it('atomically cancels pending jobs, removes queue work, and signals workers', async () => {
     const service = new AuditCancellationService(prisma, queues, events, trail);
     await service.cancel('aud_1', actor);
-    expect(tx.auditJob.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { auditId: 'aud_1', status: 'queued' } }));
+    expect(tx.auditJob.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: { auditId: 'aud_1', status: { in: ['queued', 'waiting'] } } }));
     expect(queues.removePending).toHaveBeenCalledWith('semgrep', 'job_wait');
     expect(queues.publishCancellation).toHaveBeenCalledWith('aud_1');
     expect(queues.wakeScheduler).toHaveBeenCalledWith({ auditId: 'aud_1', auditJobId: 'job_wait', projectId: 'prj_1' });

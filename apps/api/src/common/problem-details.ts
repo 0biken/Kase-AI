@@ -50,6 +50,11 @@ export const ERROR_CODES = {
   },
   RATE_LIMITED: { status: HttpStatus.TOO_MANY_REQUESTS, title: 'Rate limit exceeded' },
   INTERNAL: { status: HttpStatus.INTERNAL_SERVER_ERROR, title: 'Internal server error' },
+  AI_CONFIGURATION_REQUIRED: { status: HttpStatus.UNPROCESSABLE_ENTITY, title: 'AI configuration required' },
+  METHODOLOGY_CORRUPT: { status: HttpStatus.INTERNAL_SERVER_ERROR, title: 'Methodology corpus is corrupted' },
+  BUDGET_EXCEEDED: { status: HttpStatus.UNPROCESSABLE_ENTITY, title: 'AI budget exceeded' },
+  PROVIDER_ERROR: { status: HttpStatus.BAD_GATEWAY, title: 'AI provider error' },
+  CAPABILITY_VALIDATION_FAILED: { status: HttpStatus.UNPROCESSABLE_ENTITY, title: 'Capability validation failed' },
 } as const;
 
 export type ErrorCode = keyof typeof ERROR_CODES;

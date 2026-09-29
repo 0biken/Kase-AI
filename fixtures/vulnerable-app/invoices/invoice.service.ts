@@ -24,4 +24,8 @@ export class InvoiceService {
   async findScoped(id: string, requesterId: string): Promise<Invoice | null> {
     return prisma.invoice.findFirst({ where: { id, ownerId: requesterId } });
   }
+
+  async listByOwner(requesterId: string): Promise<Invoice[]> {
+    return prisma.invoice.findMany({ where: { ownerId: requesterId } });
+  }
 }

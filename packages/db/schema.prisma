@@ -29,6 +29,8 @@ model Project {
   suppressions      Suppression[]
   secrets           Secret[]
   evidenceRetentionOverride ProjectEvidenceRetentionOverride?
+  aiConfiguration    ProjectAiConfiguration?
+  testIdentities     TestIdentity[]
 }
 
 model Repository {
@@ -61,6 +63,7 @@ model Target {
   authCredential Secret? @relation("TargetCredential", fields: [authCredentialId, projectId], references: [id, projectId], onDelete: Restrict)
   audits         Audit[]
   endpointInventories EndpointInventory[]
+  testIdentities     TestIdentity[]
 
   @@index([projectId])
   @@index([authCredentialId, projectId])
@@ -114,6 +117,13 @@ model Audit {
   endpointInventory EndpointInventory?
   reconRequestBudget ReconRequestBudget?
   reconRequestReservations ReconRequestReservation[]
+  aiSnapshot         AuditAiSnapshot?
+  aiBudget           AuditAiBudget?
+  aiUsage            AiUsage[]
+  aiBudgetReservations AiBudgetReservation[]
+  agentRuns          AgentRun[]
+  coverageResults    AgentCoverageResult[]
+  codeMap            CodeMap?
 
   @@unique([projectId, idempotencyKey])
   @@index([projectId, startedAt])
@@ -147,6 +157,8 @@ model AuditJob {
   timeoutMs  Int
   maxRetries Int       @default(2)
   required   Boolean   @default(true)
+  parentJobId String?
+  continuations Int    @default(0)
   enqueuedAt DateTime? @db.Timestamptz(3)
   startedAt  DateTime? @db.Timestamptz(3)
   finishedAt DateTime? @db.Timestamptz(3)
@@ -156,11 +168,15 @@ model AuditJob {
   errorClass String?
 
   audit      Audit           @relation(fields: [auditId], references: [id])
+  parentJob  AuditJob?  @relation("JobParent", fields: [parentJobId], references: [id])
+  childJobs  AuditJob[] @relation("JobParent")
   executions ToolExecution[]
   reconRequestReservations ReconRequestReservation[]
+  toolInvocations AgentToolInvocation[]
 
   @@index([auditId, status])
   @@index([leaseExpiresAt])
+  @@index([parentJobId])
 }
 
 /// Ordered, durable audit progress. The sequence is allocated while the
@@ -222,6 +238,7 @@ model Evidence {
   audit           Audit             @relation(fields: [auditId], references: [id])
   toolExecution   ToolExecution?    @relation(fields: [toolExecutionId], references: [id], onDelete: SetNull)
   findingEvidence FindingEvidence[]
+  agentTurns      AgentTurn[]
 
   @@index([auditId])
   @@index([auditId, type])
@@ -249,6 +266,8 @@ model Secret {
   versions     SecretVersion[]
   repositories Repository[]    @relation("RepositoryCredential")
   targets      Target[]        @relation("TargetCredential")
+  aiConfigurations   ProjectAiConfiguration[] @relation("AiCredential")
+  testIdentityCredentials TestIdentity[] @relation("TestIdentityCredential")
 
   @@unique([projectId, name])
   @@unique([id, projectId])
@@ -377,7 +396,19 @@ model EndpointDrift {
 
 model CodeMap {
   id            String         @id
+  auditId       String?        @unique
+  projectId     String?
+  repositoryId  String?
+  commitSha     String?
+  framework     String?        // 'nestjs' | 'fastapi'
+  legacy        Boolean        @default(false)
+  generatedAt   DateTime       @default(now()) @db.Timestamptz(3)
+
+  audit         Audit?         @relation(fields: [auditId], references: [id], onDelete: Cascade)
   routeMappings RouteMapping[]
+
+  @@index([projectId, repositoryId, commitSha, framework])
+  @@index([projectId])
 }
 
 model RouteMapping {
@@ -393,7 +424,7 @@ model RouteMapping {
   serviceSymbols String[]
   source         String // 'runtime_dump' | 'openapi' | 'static_parse'
 
-  codeMap CodeMap @relation(fields: [codeMapId], references: [id])
+  codeMap CodeMap @relation(fields: [codeMapId], references: [id], onDelete: Cascade)
 }
 
 model FindingIdentity {
@@ -754,4 +785,244 @@ model Invite {
   /// updates that row rather than racing two acceptances.
   @@unique([email, organizationId])
   @@index([email])
+}
+
+// ---------------------------------------------------------------------------
+// M4 — AI Provider, Agent Runtime, and Budget
+// ---------------------------------------------------------------------------
+
+model ModelCatalogEntry {
+  id                   String    @id
+  provider             String    // 'anthropic' | 'openai'
+  modelId              String    // exact: 'claude-sonnet-4-20250514'
+  catalogRevision      Int
+  displayName          String
+  contextLimit         Int
+  outputLimit          Int
+  capabilities         String[]  // ['tool_use', 'streaming', 'prompt_caching']
+  inputPricePerMToken  Decimal?  @db.Decimal(10,6)
+  outputPricePerMToken Decimal?  @db.Decimal(10,6)
+  cachedPricePerMToken Decimal?  @db.Decimal(10,6)
+  status               String    @default("available") // 'available' | 'deprecated' | 'retired'
+  retiredAt            DateTime? @db.Timestamptz(3)
+  createdAt            DateTime  @default(now()) @db.Timestamptz(3)
+
+  @@unique([provider, modelId, catalogRevision])
+  @@index([provider, status])
+}
+
+model ProjectAiConfiguration {
+  projectId            String   @id
+  provider             String
+  modelId              String
+  catalogRevision      Int
+  credentialMode       String   // 'project_secret' | 'platform'
+  credentialSecretId   String?
+  budgetTotalTokens    Int      @default(2000000)
+  budgetMaxCalls       Int      @default(120)
+  budgetMaxContextBytes Int     @default(400000)
+  budgetMaxOutputTokens Int     @default(16000)
+  budgetBlackboxTokens Int      @default(900000)
+  budgetBlackboxCalls  Int      @default(54)
+  budgetWhiteboxTokens Int      @default(700000)
+  budgetWhiteboxCalls  Int      @default(42)
+  updatedBy            String
+  updatedAt            DateTime @updatedAt @db.Timestamptz(3)
+  createdAt            DateTime @default(now()) @db.Timestamptz(3)
+
+  project              Project  @relation(fields: [projectId], references: [id])
+  credentialSecret     Secret?  @relation("AiCredential", fields: [credentialSecretId, projectId], references: [id, projectId])
+
+  @@index([provider, modelId])
+}
+
+model TestIdentity {
+  id                   String   @id
+  projectId            String
+  targetId             String
+  label                String   // 'alice' | 'bob'
+  credentialSecretId   String
+  active               Boolean  @default(true)
+  createdBy            String
+  createdAt            DateTime @default(now()) @db.Timestamptz(3)
+
+  project              Project  @relation(fields: [projectId], references: [id])
+  target               Target   @relation(fields: [targetId], references: [id])
+  credentialSecret     Secret   @relation("TestIdentityCredential", fields: [credentialSecretId, projectId], references: [id, projectId])
+
+  @@index([projectId, targetId, active])
+}
+
+model AuditAiSnapshot {
+  auditId              String   @id
+  provider             String
+  modelId              String
+  catalogRevision      Int
+  modelContextLimit    Int
+  modelOutputLimit     Int
+  credentialMode       String
+  credentialSecretId   String?
+  credentialSecretVersion Int?
+  promptVersion        String
+  methodologyDigest    String
+  budgetTotalTokens    Int
+  budgetMaxCalls       Int
+  budgetMaxContextBytes Int
+  budgetMaxOutputTokens Int
+  budgetBlackboxTokens Int
+  budgetBlackboxCalls  Int
+  budgetWhiteboxTokens Int
+  budgetWhiteboxCalls  Int
+  createdAt            DateTime @default(now()) @db.Timestamptz(3)
+
+  audit                Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+}
+
+model AuditAiBudget {
+  auditId              String   @id
+  totalTokensLimit     Int
+  totalCallsLimit      Int
+  contextBytesLimit    Int
+  totalTokensConsumed  Int      @default(0)
+  totalCallsConsumed   Int      @default(0)
+  contextBytesConsumed Int      @default(0)
+  totalTokensReserved  Int      @default(0)
+  totalCallsReserved   Int      @default(0)
+  bbTokensConsumed     Int      @default(0)
+  bbCallsConsumed      Int      @default(0)
+  bbTokensReserved     Int      @default(0)
+  bbCallsReserved      Int      @default(0)
+  wbTokensConsumed     Int      @default(0)
+  wbCallsConsumed      Int      @default(0)
+  wbTokensReserved     Int      @default(0)
+  wbCallsReserved      Int      @default(0)
+  degradationState     String   @default("green") // 'green' | 'yellow' | 'red' | 'exceeded'
+  degradedAt           DateTime? @db.Timestamptz(3)
+  deadlineAt           DateTime? @db.Timestamptz(3)
+  updatedAt            DateTime @updatedAt @db.Timestamptz(3)
+
+  audit                Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+}
+
+model AiBudgetReservation {
+  id                   String    @id
+  auditId              String
+  audit                Audit     @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  agentRole            String    // 'blackbox' | 'whitebox'
+  turnSequence         Int
+  callId               String
+  estimatedInput       Int
+  maxOutput            Int
+  contextBytes         Int       @default(0)
+  status               String    @default("active") // 'active' | 'settled' | 'expired'
+  settledInput         Int?
+  settledOutput        Int?
+  settledCached        Int?
+  createdAt            DateTime  @default(now()) @db.Timestamptz(3)
+  settledAt            DateTime? @db.Timestamptz(3)
+
+  @@unique([auditId, agentRole, turnSequence, callId])
+  @@index([auditId, status])
+}
+
+model AiUsage {
+  id                   String   @id
+  auditId              String
+  agentRunId           String?
+  providerRequestId    String?
+  stage                String   // 'blackbox' | 'whitebox' | 'correlation' | 'review' | 'report'
+  provider             String
+  model                String
+  inputTokens          Int
+  outputTokens         Int
+  cachedTokens         Int      @default(0)
+  latencyMs            Int
+  retries              Int      @default(0)
+  outcome              String   // 'success' | 'refusal' | 'error' | 'timeout' | 'cancelled' | 'budget_exhausted'
+  costUsd              Decimal? @db.Decimal(10,6)
+  createdAt            DateTime @default(now()) @db.Timestamptz(3)
+
+  audit                Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  @@index([auditId, stage])
+}
+
+model AgentRun {
+  id                   String    @id
+  auditId              String
+  auditJobId           String
+  role                 String    // 'blackbox' | 'whitebox'
+  status               String    // 'running' | 'waiting_for_tool' | 'completed' | 'failed' | 'cancelled' | 'budget_exhausted'
+  currentTurn          Int       @default(0)
+  nextTurnSequence     Int       @default(0)
+  nextCallSequence     Int       @default(0)
+  currentTranscriptId  String?
+  promptVersion        String
+  terminalSummary      String?
+  waitingForJobId      String?
+  deadline             DateTime? @db.Timestamptz(3)
+  startedAt            DateTime  @default(now()) @db.Timestamptz(3)
+  finishedAt           DateTime? @db.Timestamptz(3)
+
+  audit                Audit     @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  turns                AgentTurn[]
+  toolInvocations      AgentToolInvocation[]
+
+  @@unique([auditId, role])
+  @@index([auditJobId])
+}
+
+model AgentTurn {
+  id                   String   @id
+  agentRunId           String
+  turnSequence         Int
+  role                 String   // 'assistant' | 'tool_result'
+  transcriptEvidenceId String?
+  inputTokens          Int?
+  outputTokens         Int?
+  cachedTokens         Int?
+  createdAt            DateTime @default(now()) @db.Timestamptz(3)
+
+  agentRun             AgentRun @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+  transcriptEvidence   Evidence? @relation(fields: [transcriptEvidenceId], references: [id], onDelete: SetNull)
+
+  @@unique([agentRunId, turnSequence])
+}
+
+model AgentToolInvocation {
+  id                   String    @id
+  agentRunId           String
+  turnSequence         Int
+  callId               String
+  capability           String
+  arguments            Json
+  argumentsValid       Boolean
+  validationErrors     String[]
+  status               String    // 'pending' | 'dispatched' | 'completed' | 'failed' | 'cancelled'
+  childJobId           String?
+  resultEvidenceIds    String[]
+  providerCallId       String?
+  result               Json?
+  createdAt            DateTime  @default(now()) @db.Timestamptz(3)
+  completedAt          DateTime? @db.Timestamptz(3)
+
+  agentRun             AgentRun  @relation(fields: [agentRunId], references: [id], onDelete: Cascade)
+  childJob             AuditJob? @relation(fields: [childJobId], references: [id], onDelete: SetNull)
+
+  @@unique([agentRunId, turnSequence, callId])
+  @@index([childJobId])
+}
+
+model AgentCoverageResult {
+  id                   String   @id
+  auditId              String
+  agentRole            String   // 'blackbox' | 'whitebox'
+  category             String
+  outcome              String   // 'passed' | 'finding' | 'blocked'
+  blockedReason        String?  // 'tool_unavailable' | 'target_unreachable' | 'auth_failed' | 'out_of_scope' | 'budget_exhausted' | 'destructive_not_authorized'
+  createdAt            DateTime @default(now()) @db.Timestamptz(3)
+
+  audit                Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
+
+  @@unique([auditId, agentRole, category])
 }

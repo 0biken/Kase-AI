@@ -32,6 +32,17 @@ export declare const ID_PREFIX: {
   readonly invite: 'inv';
   readonly secret: 'sec';
   readonly secretVersion: 'sver';
+  readonly agentRun: 'arun';
+  readonly agentTurn: 'atrn';
+  readonly agentToolInvocation: 'ainv';
+  readonly aiBudgetReservation: 'abr';
+  readonly aiUsageRecord: 'aur';
+  readonly modelCatalogEntry: 'mcat';
+  readonly projectAiConfiguration: 'paic';
+  readonly auditAiSnapshot: 'asnp';
+  readonly auditAiBudget: 'abud';
+  readonly testIdentity: 'tid';
+  readonly agentCoverageResult: 'acov';
 };
 
 export type IdKind = keyof typeof ID_PREFIX;

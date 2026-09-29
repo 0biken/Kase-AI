@@ -30,7 +30,7 @@ export class AuditCancellationService {
       if (audit.cancellationRequestedAt) return { audit, pending: [], wakeJobId: null, repeated: true };
       const now = new Date();
       await tx.auditJob.updateMany({
-        where: { auditId, status: 'queued' },
+        where: { auditId, status: { in: ['queued', 'waiting'] } },
         data: { status: 'cancelled', finishedAt: now, enqueuedAt: null, errorClass: 'cancelled' },
       });
       const updated = await tx.audit.update({
@@ -39,7 +39,7 @@ export class AuditCancellationService {
       });
       return {
         audit: updated,
-        pending: audit.jobs.filter((job: any) => job.status === 'queued').map((job: any) => ({ id: job.id, kind: job.kind })),
+        pending: audit.jobs.filter((job: any) => ['queued', 'waiting'].includes(job.status)).map((job: any) => ({ id: job.id, kind: job.kind })),
         wakeJobId: audit.jobs[0]?.id ?? null,
         repeated: false,
       };

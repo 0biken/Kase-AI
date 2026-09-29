@@ -43,6 +43,17 @@ const ID_PREFIX = {
   invite: 'inv',
   secret: 'sec',
   secretVersion: 'sver',
+  agentRun: 'arun',
+  agentTurn: 'atrn',
+  agentToolInvocation: 'ainv',
+  aiBudgetReservation: 'abr',
+  aiUsageRecord: 'aur',
+  modelCatalogEntry: 'mcat',
+  projectAiConfiguration: 'paic',
+  auditAiSnapshot: 'asnp',
+  auditAiBudget: 'abud',
+  testIdentity: 'tid',
+  agentCoverageResult: 'acov',
 };
 
 /** Crockford base32, 26 chars — the ULID canonical form. */

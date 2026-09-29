@@ -1,10 +1,13 @@
+import { S3Service } from '../storage/s3.service';
+import { CodeMapService } from '../agent-runtime/code-map/code-map.service';
+import { RunSastSchema } from '../agent-runtime/capabilities/capability.schemas';
 import { Injectable, Logger, OnApplicationShutdown, OnModuleInit } from '@nestjs/common';
 import { Job, Worker } from 'bullmq';
 import { createHash } from 'crypto';
 import { access, readFile, writeFile } from 'fs/promises';
 import { resolve } from 'path';
 import { PrismaService } from '../prisma/prisma.service';
-import { QUEUE_NORMALIZE_SEVERITY, QUEUE_PROVENANCE, QUEUE_SEMGREP, type QueueName } from '../queue/queue.constants';
+import { QUEUE_CODE_MAP, QUEUE_NORMALIZE_SEVERITY, QUEUE_PROVENANCE, QUEUE_SEMGREP, type QueueName } from '../queue/queue.constants';
 import { workerOptionsFor } from '../queue/queue.config';
 import { withJobTimeout } from '../queue/job-timeout.util';
 import type { ReconAuditJobPayload } from '../orchestrator/audit-job.payload';
@@ -17,7 +20,7 @@ import { SastWorkerService } from './sast-worker.service';
 import { newId } from '../common/ids';
 import { runControlledProcess } from './process-control';
 
-const SAST_QUEUES = [QUEUE_PROVENANCE, QUEUE_SEMGREP, QUEUE_NORMALIZE_SEVERITY] as const;
+const SAST_QUEUES = [QUEUE_CODE_MAP, QUEUE_PROVENANCE, QUEUE_SEMGREP, QUEUE_NORMALIZE_SEVERITY] as const;
 
 @Injectable()
 export class SastJobConsumerService implements OnModuleInit, OnApplicationShutdown {
@@ -32,6 +35,8 @@ export class SastJobConsumerService implements OnModuleInit, OnApplicationShutdo
     private readonly checkouts: GitCheckoutService,
     private readonly retention: RetentionPolicyService,
     private readonly sast: SastWorkerService,
+    private readonly maps: CodeMapService,
+    private readonly storage: S3Service,
   ) {}
 
   onModuleInit(): void {
@@ -57,6 +62,12 @@ export class SastJobConsumerService implements OnModuleInit, OnApplicationShutdo
       await withJobTimeout(payload.auditJobId, storedJob.timeoutMs, async (timeoutSignal) => {
         const signal = AbortSignal.any([timeoutSignal, cancellation.signal]);
         if (queue === QUEUE_PROVENANCE) await this.buildProvenance(payload, signal);
+        else if (queue === QUEUE_CODE_MAP) {
+          const audit = await this.loadAudit(payload);
+          if (!audit.buildProvenance?.commitSha) throw new Error('Build provenance missing');
+          const checkout = await this.checkouts.checkout(audit.repository, audit.buildProvenance.commitSha, signal);
+          await this.maps.buildForAudit(audit.id, payload.projectId, audit.repositoryId, audit.buildProvenance.commitSha, checkout);
+        }
         else if (queue === QUEUE_SEMGREP) await this.runSemgrep(payload, signal);
         else await this.normalize(payload, signal);
       });
@@ -101,6 +112,8 @@ export class SastJobConsumerService implements OnModuleInit, OnApplicationShutdo
     const audit = await this.loadAudit(payload);
     if (!audit.buildProvenance?.commitSha) throw new Error('Build provenance is missing');
     const checkoutPath = await this.checkouts.checkout(audit.repository, audit.buildProvenance.commitSha, signal);
+    const invocation = await this.prisma.agentToolInvocation.findFirst({ where: { childJobId: payload.auditJobId } });
+    if (invocation && RunSastSchema.parse(invocation.arguments).packReference !== 'typescript-security') throw new Error('Unapproved SAST pack');
     const rulePackPath = resolve(process.env.KASE_SAST_RULE_PACK ?? 'rules/kase/typescript-security/idor/missing-ownership-predicate.yml');
     const ruleBytes = await readFile(rulePackPath);
     const rulePackSha256 = createHash('sha256').update(ruleBytes).digest('hex');
@@ -108,12 +121,18 @@ export class SastJobConsumerService implements OnModuleInit, OnApplicationShutdo
       throw new Error('Configured rule pack digest mismatch');
     }
     const expiresAt = await this.retention.expiryForCapture(payload.projectId, { type: 'sast_json', replayable: true });
-    await this.sast.executeSemgrep({
+    const executed = await this.sast.executeSemgrep({
       ...payload, checkoutPath, rulePackPath, rulePackSha256,
       commitSha: audit.buildProvenance.commitSha,
       affectedTarget: audit.target?.baseUrl ?? audit.repository.url,
       expiresAt, signal,
     });
+    if (invocation) {
+      const evidence = await this.prisma.evidence.findFirstOrThrow({ where: { id: executed.evidenceId, auditId: payload.auditId, tombstonedAt: null, expiresAt: { gt: new Date() } } });
+      const bytes = await this.storage.downloadEvidence(evidence.artifactUri!);
+      if (createHash('sha256').update(bytes).digest('hex') !== evidence.sha256) throw new Error('SAST observation digest mismatch');
+      await this.prisma.agentToolInvocation.update({ where: { id: invocation.id }, data: { status: 'completed', completedAt: new Date(), resultEvidenceIds: [evidence.id] } });
+    }
     await holdForComposeProofOnce(checkoutPath, payload.auditJobId, signal);
   }
 

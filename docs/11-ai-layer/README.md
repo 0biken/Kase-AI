@@ -10,16 +10,16 @@ The domain layer must not depend on one model provider.
 
 ```ts
 interface AIProvider {
-  analyze(req: AnalyzeRequest): Promise<AnalyzeResult>
-  summarize(req: SummarizeRequest): Promise<SummarizeResult>
-  correlate(req: CorrelateRequest): Promise<CorrelateResult>
-  reviewFinding(req: ReviewRequest): Promise<ReviewResult>
-  generateReport(req: ReportRequest): Promise<ReportResult>
-  runAgentLoop(req: AgentRequest): AsyncIterable<AgentEvent>
+  readonly providerName: 'anthropic' | 'openai'
+  runTurn(req: ProviderRequest, signal?: AbortSignal): AsyncIterable<ProviderEvent>
 }
 ```
 
-Implementations: Anthropic (default), OpenAI. Every request carries a `TokenBudget` handle and every response reports actual usage.
+Implementations: Anthropic Messages and OpenAI Responses. ADR-017 requires explicit provider and model selection; there is no default or fallback provider. Every request carries a budget handle and every completed response reports actual usage. The worker owns the durable loop; adapters only translate one provider turn.
+
+Each project selects an exact model and catalog revision with streaming and tool-use support. Credential mode is explicit: `project_secret` references a live project-owned provider secret, while `platform` requires an explicit deployment policy. Dispatch freezes the credential reference and version, budgets, model, prompt version, and verified methodology digest. Revocation is rechecked when resolving each provider client.
+
+Provider clients live in the agent-worker dependency graph. Deterministic audit defaults and API startup do not require provider credentials. Agent Router base URLs and allowed hosts must be configured explicitly; the worker uses its egress proxy and never substitutes direct provider APIs.
 
 ### Model pinning
 
@@ -31,7 +31,7 @@ Model upgrades are an explicit, reviewed project action.
 
 | Stage | AI role | Authority |
 |---|---|---|
-| Audit planning | Propose job graph | Schema-validated; falls back to static plan |
+| Audit planning | None in M4 | Deterministic graph with explicit opt-in agent categories |
 | Black-box agent | Reason about what to test, propose findings | Proposes only |
 | White-box agent | Read code, propose findings with patches | Proposes only |
 | Correlation | Fallback inference when deterministic mapping fails | **Advisory; never gate-eligible** |
@@ -132,7 +132,7 @@ Enforced globally per target host across concurrent audits. This is the differen
 |---|---|---|
 | GREEN | < 50% | Normal |
 | YELLOW | 50–80% | Skip optional AI enrichment; prefer deterministic tools |
-| RED | > 80% | Stop discovery; complete normalization, correlation, report only |
+| RED | ≥ 80% | Stop new exploratory tools; persist existing results and finish the agent run |
 | EXCEEDED | 100% | Terminate agents cleanly, preserve partial results |
 
 ### The trap this closes

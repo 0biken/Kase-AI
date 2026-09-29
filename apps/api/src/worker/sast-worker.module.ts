@@ -1,3 +1,4 @@
+import { CodeMapModule } from '../agent-runtime/code-map/code-map.module';
 import { Module } from '@nestjs/common';
 import { PrismaModule } from '../prisma/prisma.module';
 import { QueueModule } from '../queue/queue.module';
@@ -16,7 +17,7 @@ import { SastJobConsumerService } from './sast-job-consumer.service';
 
 @Module({
   imports: [
-    PrismaModule, QueueModule, StorageModule, AuditTrailModule, AuditEventsModule,
+    CodeMapModule, PrismaModule, QueueModule, StorageModule, AuditTrailModule, AuditEventsModule,
     EvidenceModule, FindingsModule, ProvenanceModule, RetentionModule,
   ],
   providers: [

@@ -119,6 +119,32 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+  agent-egress-proxy:
+    image: ubuntu/squid:6.6-24.04_beta
+    volumes:
+      - ./infra/egress/agent-squid.conf:/etc/squid/squid.conf:ro
+      - ./infra/egress/agent-allowed-hosts.txt:/etc/squid/allowed-hosts.txt:ro
+    networks:
+      - agent-egress
+      - agent-egress-upstream
+    read_only: true
+    cap_drop:
+      - ALL
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /run:size=16m,mode=0775,uid=13,gid=13
+      - /var/spool/squid:size=32m,mode=0755,uid=13,gid=13
+      - /var/log/squid:size=16m,mode=0755,uid=13,gid=13
+    healthcheck:
+      test: ["CMD-SHELL", "test -s /run/squid.pid && kill -0 \"$(cat /run/squid.pid)\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
 
   migrate:
     build:
@@ -215,6 +241,66 @@ services:
         limits:
           cpus: "1.0"
           memory: 512m
+
+  worker-agent-main:
+    build:
+      context: .
+      dockerfile: workers/Dockerfile
+      target: worker-agent
+    user: "10001:10001"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+      - seccomp=./infra/seccomp/worker.json
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+      - /run/kase-secrets:size=4m,mode=0700,uid=10001,gid=10001
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://kase:password@postgres:5432/kase?schema=public
+      KASE_REDIS_HOST: redis
+      KASE_REDIS_PORT: 6379
+      S3_ENDPOINT: http://minio:9000
+      S3_BUCKET: kase-evidence
+      S3_ACCESS_KEY: minioadmin
+      S3_SECRET_KEY: minioadmin
+      KASE_LOCAL_KEK: ${KASE_LOCAL_KEK:?Set KASE_LOCAL_KEK to a 32-byte base64 key}
+      HTTP_PROXY: http://agent-egress-proxy:3128
+      HTTPS_PROXY: http://agent-egress-proxy:3128
+      KASE_AGENT_EGRESS_PROXY: http://agent-egress-proxy:3128
+      KASE_CHECKOUT_ROOT: /workspace/.kase-checkouts
+      KASE_AGENT_ROUTER_HOSTS: ${KASE_AGENT_ROUTER_HOSTS:-}
+      KASE_OPENAI_BASE_URL: ${KASE_OPENAI_BASE_URL:-}
+      KASE_ANTHROPIC_BASE_URL: ${KASE_ANTHROPIC_BASE_URL:-}
+      KASE_WORKER_IMAGE_DIGEST: kase/worker-agent-main:dev
+      HOME: /tmp
+      KASE_JOB_LEASE_MS: ${KASE_JOB_LEASE_MS:-60000}
+      KASE_JOB_HEARTBEAT_MS: ${KASE_JOB_HEARTBEAT_MS:-20000}
+      KASE_BULL_LOCK_DURATION_MS: ${KASE_BULL_LOCK_DURATION_MS:-60000}
+      KASE_BULL_STALLED_INTERVAL_MS: ${KASE_BULL_STALLED_INTERVAL_MS:-15000}
+    depends_on:
+      sast-checkout-init:
+        condition: service_completed_successfully
+      migrate:
+        condition: service_completed_successfully
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+      agent-egress-proxy:
+        condition: service_healthy
+    networks:
+      - kase-core
+      - agent-egress
+    volumes:
+      - sast-checkouts:/workspace/.kase-checkouts:ro
+    deploy:
+      resources:
+        limits:
+          cpus: "2.0"
+          memory: 1024m
 
   recon-trap:
     image: node:22-alpine
@@ -394,5 +480,10 @@ networks:
   api-host:
   recon-egress:
     internal: true
+  agent-egress:
+    internal: true
+  # Only the proxy gets this route; the agent worker remains on internal
+  # networks and cannot establish upstream connections directly.
+  agent-egress-upstream:
   target-net:
     internal: true

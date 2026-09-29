@@ -42,6 +42,9 @@ export const prisma = {
     async findFirst({ where }: { where: Record<string, unknown> }): Promise<Invoice | null> {
       return invoices.find((row) => matches(row as never, where)) ?? null;
     },
+    async findMany({ where }: { where: Record<string, unknown> }): Promise<Invoice[]> {
+      return invoices.filter((row) => matches(row as never, where));
+    },
   },
   user: {
     async findByToken(token: string): Promise<User | null> {

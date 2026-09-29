@@ -22,6 +22,7 @@ The decisions that changed the design, and why. Each records what was rejected a
 | [014](#adr-014--k6-in-v1-behind-explicit-authorization) | k6 in v1, behind explicit authorization | Accepted |
 | [015](#adr-015--ship-kase-rules-never-semgrep-registry-rules) | Ship Kase rules, never Semgrep Registry rules | Accepted |
 | [016](#adr-016--bounded-retention-and-mandatory-capture-time-redaction) | Bounded retention and mandatory capture-time redaction | Accepted |
+| [017](#adr-017--provider-neutral-ai-interface-with-explicit-credentials) | Provider-neutral AI interface with explicit credentials | Accepted |
 
 ---
 
@@ -248,6 +249,32 @@ At expiry the retention worker hard-deletes object bytes, then clears `artifactU
 **Rejected.** Indefinite artifact retention; one fixed platform window; customer ability to disable baseline redaction; extending existing deletion commitments after a policy increase; post-hoc redaction; and storing unsanitized binary evidence behind stricter authorization. Each either breaks an explicit deletion promise or stores sensitive bytes before Kase has made them safe.
 
 **Consequence.** M2 has one authoritative privacy and lifecycle contract. Replayable evidence gets the longest useful window, customers can minimize or extend within a bounded range, and historical findings remain explainable without retaining the original object forever.
+
+---
+
+## ADR-017 — Provider-neutral AI interface with explicit credentials
+
+**Context.** The LLM provider contract was the last open Phase 0 decision. Existing docs/11-ai-layer named "Anthropic (default)" and carried method-per-task signatures (`analyze`, `summarize`, `correlate`). Making one provider the automatic default means a project missing its config silently routes to Anthropic; method-per-task signatures mix orchestration concerns into the provider boundary.
+
+**Decision.** A single streaming interface:
+
+```ts
+interface AIProvider {
+  runTurn(request: ProviderRequest, signal?: AbortSignal): AsyncIterable<ProviderEvent>;
+}
+```
+
+Requests contain an exact model ID (never `latest`, `sonnet`, or `opus`), provider-neutral messages, Kase-owned tool schemas, cacheable prompt blocks, an output limit, and a budget handle. Events normalize text deltas, tool calls, usage, completion, refusal, retryable errors, and permanent errors. Anthropic Messages and OpenAI Responses adapters sit behind this interface; no provider-native response object escapes the adapter.
+
+Provider-hosted tools, web access, code execution, MCP, computer use, and parallel tool calls are disabled. Models invoke only Kase-defined function tools.
+
+A deployment-owned model catalog carries provider, exact model ID, catalog revision, context/output limits, capabilities, and optional token prices. Project configuration selects a catalog entry; provider retirement produces a configuration error until an administrator chooses another model.
+
+Two credential modes are supported explicitly — `project_secret` (an active same-project Secret whose kind matches the provider) and `platform` (a provider key injected only into `worker-agent`, enabled by deployment policy). There is no fallback between credential modes or providers. A revoked or missing credential fails before an agent job is enqueued.
+
+**Rejected.** The original method-per-task interface (`analyze`, `summarize`, `correlate`, `reviewFinding`, `generateReport`, `runAgentLoop`) — the orchestration layer, not the provider adapter, decides what to do with a model turn; collapsing that into the provider interface mixes concerns and makes every new use case a provider-contract change. A single-provider default — a missing configuration should fail loudly, not silently route to one vendor. Automatic alias resolution (`latest`, `sonnet`) — when a provider deprecates a model, the alias silently changes audit behavior and makes prior findings unexplainable.
+
+**Consequence.** Every AI-enabled project requires explicit provider and model selection. No provider is privileged. The Phase 0 LLM provider decision is closed at 15/15.
 
 ---
 

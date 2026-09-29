@@ -24,6 +24,7 @@ export const QUEUE_HTTPX_VERIFY = 'httpx-verify';
 export const QUEUE_INVENTORY_MERGE = 'inventory-merge';
 export const QUEUE_INVENTORY_DRIFT = 'inventory-drift';
 export const QUEUE_NORMALIZE_SEVERITY = 'normalize-severity';
+export const QUEUE_CODE_MAP = 'code-map';
 
 export const JOB_QUEUES = [
   QUEUE_RECON,
@@ -41,6 +42,7 @@ export const JOB_QUEUES = [
   QUEUE_INVENTORY_MERGE,
   QUEUE_INVENTORY_DRIFT,
   QUEUE_NORMALIZE_SEVERITY,
+  QUEUE_CODE_MAP,
 ] as const;
 
 export const ALL_QUEUES = [QUEUE_AUDIT, ...JOB_QUEUES] as const;
@@ -64,4 +66,5 @@ export const QUEUE_BY_JOB_KIND: Record<string, QueueName> = {
   inventory_merge: QUEUE_INVENTORY_MERGE,
   inventory_drift: QUEUE_INVENTORY_DRIFT,
   normalize_severity: QUEUE_NORMALIZE_SEVERITY,
+  code_map: QUEUE_CODE_MAP,
 };

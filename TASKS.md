@@ -4,18 +4,18 @@ Executable form of [19 — Roadmap](docs/19-roadmap/README.md). Ordered by depen
 
 **Legend:** `[x]` done · `[~]` partially done · `[ ]` not started · **⚠** blocks other work
 
-**130 tasks, 57 done.** Counts include milestone exit criteria, which are the real gates.
+**130 tasks, 59 done.** Counts are derived from milestone and invariant checkboxes, including exit criteria; the five deferred items are excluded.
 
 | | Phase 0 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | Invariants |
 |---|---|---|---|---|---|---|---|---|---|
-| Done | 14 | 16 | 18 | 9 | 0 | 0 | 0 | 0 | 0 |
+| Done | 15 | 16 | 18 | 9 | 1 | 0 | 0 | 0 | 0 |
 | Total | 15 | 16 | 18 | 9 | 15 | 14 | 16 | 19 | 8 |
 
 ---
 
 ## Phase 0 — Decisions and de-risking
 
-Non-code work that blocks code. Only the M4 LLM provider contract remains open.
+Non-code work that blocks code. ADR-017 closes the provider decision; M4 implementation and behavioral proofs are reopened.
 
 - [x] **Semgrep ruleset licensing review** — [ADR-015](docs/20-adr/README.md#adr-015--ship-kase-rules-never-semgrep-registry-rules)
   - [x] Enumerate the exact rulesets Kase intends to ship
@@ -26,7 +26,7 @@ Non-code work that blocks code. Only the M4 LLM provider contract remains open.
   - [x] Default retention window per evidence type (traces and screenshots are the expensive ones)
   - [x] PII position: mandatory capture-time baseline; unsafe binary evidence is dropped and degrades the audit
   - [x] Organization defaults plus project overrides; hard-delete bytes and retain a safe metadata tombstone
-- [ ] **LLM provider contract and rate limits** — blocks M4 budget design
+- [x] **LLM provider contract and rate limits** — ADR-017; implementation verification tracked in M4
 - [x] **Secrets management** — portable `KeyEncryptionProvider`, local development KEK, production cloud KMS seam; envelope encryption confirmed
 - [x] **Correlation spike** — [`spike/correlation/`](spike/correlation/README.md), 11/11 passing
 - [x] **Technical documentation and PRD reconciliation** — `docs/` is source of truth
@@ -136,7 +136,7 @@ Non-code work that blocks code. Only the M4 LLM provider contract remains open.
 - [ ] Schema validation on every agent output with structured error feedback and bounded retries
 
 ### Methodology
-- [ ] Vendor `references/` payloads from both `.skill` archives as the methodology corpus
+- [x] Vendor `references/` payloads from both `.skill` archives as the methodology corpus
 - [ ] Black-box agent loop over the endpoint inventory
 - [ ] White-box agent loop over the code map
 

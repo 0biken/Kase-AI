@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 
 const [compose, proof, apiPackage] = await Promise.all([
   readFile(new URL('../docker-compose.yml', import.meta.url), 'utf8'),
@@ -7,13 +9,12 @@ const [compose, proof, apiPackage] = await Promise.all([
   readFile(new URL('../apps/api/package.json', import.meta.url), 'utf8'),
 ]);
 
-const packageJson = JSON.parse(apiPackage);
-const dependencyNames = Object.keys(packageJson.dependencies ?? {});
-assert.deepEqual(
-  dependencyNames.filter((name) => /(?:openai|anthropic|langchain|ollama|gemini)/iu.test(name)),
-  [],
-  'M2 API runtime includes an AI/model dependency',
-);
+// SDK installation is not model execution. Prove deterministic default graphs
+// and dependency isolation, including a positive agent-provider control.
+const behavioral = spawnSync(process.execPath, [fileURLToPath(new URL('../apps/api/node_modules/jest/bin/jest.js', import.meta.url)), '--runInBand', 'agent-runtime/deterministic-isolation.spec.ts'], {
+  cwd: fileURLToPath(new URL('../apps/api', import.meta.url)), stdio: 'inherit',
+});
+assert.equal(behavioral.status, 0, 'Deterministic provider isolation failed');
 
 const serviceList = proof.match(/\$services\s*=\s*@\(([^)]*)\)/su)?.[1] ?? '';
 assert.ok(serviceList, 'proof must declare its explicit Compose service set');
