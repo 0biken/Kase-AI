@@ -4,11 +4,12 @@ Executable form of [19 — Roadmap](docs/19-roadmap/README.md). Ordered by depen
 
 **Legend:** `[x]` done · `[~]` partially done · `[ ]` not started · **⚠** blocks other work
 
-**130 tasks, 59 done.** Counts are derived from milestone and invariant checkboxes, including exit criteria; the five deferred items are excluded.
+**130 tasks, 59 done, 18 partial.** "Done" (`[x]`) counts only tasks whose acceptance gate has passed. M4 and M5 code is committed (`5b2303d`) and passes its local deterministic proofs and the full 415-test API suite, but its live acceptance gates (Docker Compose G5, real-provider G6, durable correlation) are still open — so those items are `[~]` (partial), not `[x]`. Counts are derived from milestone and invariant checkboxes, including exit criteria; the five deferred items are excluded.
 
 | | Phase 0 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | Invariants |
 |---|---|---|---|---|---|---|---|---|---|
 | Done | 15 | 16 | 18 | 9 | 1 | 0 | 0 | 0 | 0 |
+| Partial | 0 | 0 | 0 | 0 | 12 | 6 | 0 | 0 | 0 |
 | Total | 15 | 16 | 18 | 9 | 15 | 14 | 16 | 19 | 8 |
 
 ---
@@ -121,24 +122,26 @@ Non-code work that blocks code. ADR-017 closes the provider decision; M4 impleme
 
 **Goal:** the black-box agent finds the seeded IDOR unaided and files a schema-valid finding.
 
+> **Status:** the runtime below is implemented and committed (`5b2303d`). It passes the local deterministic proofs L1–L4 (`verify-m4-*.mjs`, ~108 cases, zero skips) and the full 415-test API suite with TypeScript clean. `[~]` marks items in that state. Certification remains open: the live Compose proof (G5) and real-provider proof (G6) cannot run here because the Docker Desktop Linux engine is unavailable and Router/model config is unset — see [GATES-M4.md](GATES-M4.md) and [M4-REPAIR-REPORT.md](M4-REPAIR-REPORT.md). The two exit criteria stay `[ ]` until those gates pass.
+
 ### Provider layer
-- [ ] `AIProvider` abstraction, model pinning, prompt caching
-- [ ] Token/call/wall-clock budget accounting per audit
-- [ ] GREEN/YELLOW/RED degradation ladder ([11](docs/11-ai-layer/README.md))
-- [ ] **Degradation sets `degraded: true`** — a budget overrun must never silently become a green build
+- [~] `AIProvider` abstraction, model pinning, prompt caching — local contract suite passes; no live provider call yet
+- [~] Token/call/wall-clock budget accounting per audit
+- [~] GREEN/YELLOW/RED degradation ladder ([11](docs/11-ai-layer/README.md))
+- [~] **Degradation sets `degraded: true`** — a budget overrun must never silently become a green build
 
 ### Capability contract ⚠
-- [ ] Typed capabilities only — no shell passthrough, no command-shaped `request_tool`
-- [ ] `create_finding`, `attach_evidence`, `get_source`, `get_route_map`
-- [ ] `record_passing_check` — distinguishes "tested and clean" from "never tested"
-- [ ] `report_blocked` — required for the "category failed to execute" gate condition
-- [ ] `request_scope_change` — denied and logged, never silently honored
-- [ ] Schema validation on every agent output with structured error feedback and bounded retries
+- [~] Typed capabilities only — no shell passthrough, no command-shaped `request_tool`
+- [~] `create_finding`, `attach_evidence`, `get_source`, `get_route_map`
+- [~] `record_passing_check` — distinguishes "tested and clean" from "never tested"
+- [~] `report_blocked` — required for the "category failed to execute" gate condition
+- [~] `request_scope_change` — denied and logged, never silently honored
+- [~] Schema validation on every agent output with structured error feedback and bounded retries
 
 ### Methodology
 - [x] Vendor `references/` payloads from both `.skill` archives as the methodology corpus
-- [ ] Black-box agent loop over the endpoint inventory
-- [ ] White-box agent loop over the code map
+- [~] Black-box agent loop over the endpoint inventory — loop implemented; unaided live discovery is exit-criterion work
+- [~] White-box agent loop over the code map
 
 **Exit criteria**
 - [ ] The black-box agent independently discovers the seeded IDOR and files a schema-valid finding carrying replayable evidence
@@ -152,14 +155,16 @@ Non-code work that blocks code. ADR-017 closes the provider decision; M4 impleme
 
 > Several assumptions here are already validated by [`spike/correlation/`](spike/correlation/README.md) — route dump, the controller→service walk, symbol-keyed fingerprints, and reachability filtering. This milestone is largely hardening and generalizing that work, not discovering it.
 
-- [ ] `kase-routemap` for NestJS — **spike-validated**, needs packaging as a real adapter
+> **Status:** the deterministic correlation core is implemented and committed (`5b2303d`) in `apps/api/src/correlation/`. It passes `verify-m5-core.mjs` (29 cases) and the full API regression + TypeScript check (`verify-m5-regressions.mjs`). `[~]` marks that state. Every gate in [GATES-M5.md](GATES-M5.md) still records `EVIDENCE: pending` — durable merge through real workers (G4) needs Docker, and dedup/lifecycle/suppression/FastAPI/Layer-4 are not yet built.
+
+- [~] `kase-routemap` for NestJS — runtime source graph + route resolution implemented and unit-proven; not yet packaged as a standalone adapter
 - [ ] `kase-routemap` for FastAPI
-- [ ] OpenAPI spec ingest as a deterministic source, ranked above static parse
-- [ ] Code map builder with symbol resolution — **spike-validated**, needs depth/cycle limits at scale
-- [ ] Correlation layers 1–3 with `method` recorded per correlation
-- [ ] **Reachability filtering** — static findings on unreachable code must not correlate (found by the spike, not in the original design)
+- [~] OpenAPI spec ingest as a deterministic source, ranked above static parse — `openapi` ranked as a `MappingMethod`; spec parsing/ingest itself not yet proven
+- [~] Code map builder with symbol resolution — depth/cycle/node bounds implemented and tested (`code-map-production.spec`)
+- [~] Correlation layers 1–3 with `method` recorded per correlation
+- [~] **Reachability filtering** — static findings on unreachable code must not correlate (found by the spike, not in the original design)
 - [ ] Layer 4 AI inference as **advisory only**, ordinal confidence, never numeric thresholds
-- [ ] Fingerprinting on deterministic inputs only — **spike-validated**
+- [~] Fingerprinting on deterministic inputs only — **spike-validated**
 - [ ] Three-level dedup: exact → semantic → AI-assisted, emitting `MATCH`/`POSSIBLE_MATCH`/`NEW_FINDING`
 - [ ] `POSSIBLE_MATCH` routes to a human queue, never auto-resolves
 - [ ] Finding lifecycle: `NEW`, `OPEN`, `FIXED`, `VERIFIED`, `REGRESSED`, `NOT_REPRODUCED`, `FALSE_POSITIVE`, `ACCEPTED_RISK`

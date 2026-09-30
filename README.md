@@ -79,7 +79,7 @@ One correlated finding, both evidence artifacts preserved, gate blocks the build
 
 ## Delivery
 
-[**Current verified progress: 57/130 tasks complete**](TASKS.md) — Phase 0 is 14/15, M1 is 16/16, M2 is 18/18, and M3 is 9/9. The retained-stack M3 acceptance evidence, including canonical inventory, denied discovery, drift, shared limits, crash recovery, live Katana/httpx cancellation, and MinIO hash verification, is recorded in [`GATES-M3.md`](GATES-M3.md).
+[**Current verified progress: 59/130 tasks gate-certified, +18 partial**](TASKS.md) — Phase 0 is 15/15, M1 is 16/16, M2 is 18/18, and M3 is 9/9. The retained-stack M3 acceptance evidence, including canonical inventory, denied discovery, drift, shared limits, crash recovery, live Katana/httpx cancellation, and MinIO hash verification, is recorded in [`GATES-M3.md`](GATES-M3.md). M4 (agent runtime) and M5 (correlation core) are implemented and committed, and pass their local deterministic proofs and the full 415-test API suite — but their live acceptance gates (Docker Compose, real-provider, durable correlation) remain open, so they count as partial, not done. See [`GATES-M4.md`](GATES-M4.md), [`M4-REPAIR-REPORT.md`](M4-REPAIR-REPORT.md), and [`GATES-M5.md`](GATES-M5.md).
 
 [TASKS.md](TASKS.md) is the executable checklist — 130 tasks across Phase 0 and M1–M7, with milestone exit criteria as the real gates. The Semgrep licensing and evidence-policy decisions are closed; the LLM provider contract is the only remaining Phase 0 item and does not block M2.
 
@@ -125,3 +125,5 @@ Their `references/` payloads (`test-categories.md`, `whitebox-categories.md`, `f
 ## Status
 
 M1 through M3 are implemented and verified by static checks and live Docker Compose proofs. The retained stack demonstrates the M2 Semgrep/evidence lifecycle and the M3 Katana/httpx recon pipeline: every discovered URL re-enters scope validation, duplicate URL variants merge into canonical endpoints, cross-audit drift is persisted, host rate limits are serialized, crash recovery remains duplicate-free, and both recon subprocesses stop under cancellation. No AI workload participates through M3. See [19 — Roadmap](docs/19-roadmap/README.md#3-milestones).
+
+M4 (provider-agnostic agent runtime) and M5 (deterministic correlation core) are committed and pass their local deterministic proofs plus the full 415-test API suite with TypeScript clean, but are **not yet gate-certified**: the live Compose proof (M4 G5), the real-provider proof (M4 G6, config-deferred), and durable correlation through real workers (M5 G4) require a Linux Docker engine that is currently unavailable on this host. Until those run, M4/M5 are tracked as partial and no milestone exit criterion is claimed. M6 (policy engine / release gate) and M7 (dashboard, integrations, observability) have not started; `apps/api/src/assurance/` is an empty placeholder module.
