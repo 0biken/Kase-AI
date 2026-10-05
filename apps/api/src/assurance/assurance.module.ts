@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { GatePolicyController } from './policy/gate-policy.controller';
 import { GatePolicyService } from './policy/gate-policy.service';
+import { GateController } from './gate/gate.controller';
 import { GateEvaluationService } from './gate/gate-evaluation.service';
 import { FailClosedReplayVerifier, REPLAY_VERIFIER } from './gate/replay-verifier';
 import { WaiversController } from './waivers/waivers.controller';
@@ -15,7 +16,7 @@ import { SuppressionService } from './waivers/suppression.service';
  * AuditTrailModule are global.
  */
 @Module({
-  controllers: [GatePolicyController, WaiversController],
+  controllers: [GatePolicyController, GateController, WaiversController],
   providers: [
     GatePolicyService,
     GateEvaluationService,

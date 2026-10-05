@@ -52,7 +52,7 @@ function harness(opts: {
     correlation: { findMany: jest.fn(async () => opts.correlations ?? []) },
     waiver: { findMany: jest.fn(async () => opts.waivers ?? []) },
     suppression: { findMany: jest.fn(async () => opts.suppressions ?? []) },
-    gateEvaluation: { create: gateEvaluationCreate },
+    gateEvaluation: { create: gateEvaluationCreate, findFirst: jest.fn(async () => (opts as { latestRow?: unknown }).latestRow ?? null) },
   };
   const policies = { getActiveParsed: opts.getActiveParsed ?? jest.fn(async () => ({ id: 'gpol_3', version: 3, policy: fullPolicy() })) };
   const trail = { record: jest.fn().mockResolvedValue(undefined) };
@@ -112,5 +112,12 @@ describe('GateEvaluationService', () => {
   it('rejects evaluation of a missing audit', async () => {
     const h = harness({ audit: null });
     await expect(h.service.evaluate('aud_missing', ACTOR, now)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('latest returns the most recent evaluation, or 404 when none exists', async () => {
+    const withRow = harness({ latestRow: { id: 'gate_1', outcome: 'pass' } } as never);
+    expect((await withRow.service.latest('aud_1')) as { id: string }).toMatchObject({ id: 'gate_1' });
+    const none = harness({});
+    await expect(none.service.latest('aud_1')).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 });

@@ -36,6 +36,13 @@ export class GateEvaluationService {
     @Inject(REPLAY_VERIFIER) private readonly replay: ReplayVerifier,
   ) {}
 
+  /** The most recent persisted evaluation for an audit. */
+  async latest(auditId: string): Promise<unknown> {
+    const row = await this.prisma.gateEvaluation.findFirst({ where: { auditId }, orderBy: { evaluatedAt: 'desc' } });
+    if (!row) throw new ProblemException('NOT_FOUND', `Audit "${auditId}" has no gate evaluation`);
+    return row;
+  }
+
   async evaluate(auditId: string, actor: Actor, now = new Date()): Promise<{ evaluation: unknown; decision: GateDecision }> {
     const audit = await this.prisma.audit.findUnique({ where: { id: auditId } });
     if (!audit) throw new ProblemException('NOT_FOUND', `No audit with id "${auditId}"`);
