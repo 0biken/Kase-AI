@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { auth } from '@/auth';
+import { KaseMark } from '@/components/kase-mark';
 import CorrelationVisual from './correlation-visual';
 // Loaded after globals.css so the depth/glow layer overrides the flat base.
 import './dashboard.css';
@@ -73,8 +74,8 @@ function Sidebar() {
   return (
     <aside className="dash-side">
       <Link className="dash-brand" href="/">
-        <span className="dash-brand-mark">K</span>
-        <span>kase</span>
+        <KaseMark size={22} />
+        <span>Kase</span>
       </Link>
 
       <nav className="dash-nav" aria-label="Workspace">

@@ -1,5 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <rect width="64" height="64" rx="17" fill="#080b0d"/>
-  <rect x="7" y="7" width="50" height="50" rx="13" fill="none" stroke="#62d5bb" stroke-width="2"/>
-  <path d="M23 18v28M24 33l17-15M24 33l18 13" fill="none" stroke="#f2f7f6" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Mirrors src/components/kase-mark.tsx (40-unit grid), scaled into a tile. -->
+  <defs>
+    <mask id="lens" maskUnits="userSpaceOnUse" x="0" y="0" width="40" height="40">
+      <rect width="40" height="40" fill="#fff"/>
+      <circle cx="17.5" cy="21" r="9" fill="#000"/>
+    </mask>
+    <clipPath id="box"><rect x="4" y="4" width="32" height="32"/></clipPath>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="#080b0d"/>
+  <g transform="translate(8 8) scale(1.2)" fill="#62d5bb" stroke="#62d5bb">
+    <g clip-path="url(#box)">
+      <g mask="url(#lens)">
+        <rect x="4" y="4" width="9.5" height="32" rx="2" stroke="none"/>
+        <path d="M11 22 31 -1" stroke-width="7.5"/>
+      </g>
+      <circle cx="17.5" cy="21" r="5.4" fill="none" stroke-width="3.2"/>
+      <path d="M21.6 24.7 41 41.5" stroke-width="6.5"/>
+    </g>
+  </g>
 </svg>

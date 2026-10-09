@@ -1,3 +1,4 @@
+import { KaseMark } from '@/components/kase-mark';
 import { signIn } from '@/auth';
 import { DENIAL_MESSAGES, type SignInDenialReason } from '@/auth/invite';
 import { providerStatuses } from '@/auth/providers';
@@ -34,7 +35,7 @@ export default async function SignIn({
 
   return (
     <main className="site-shell">
-      <nav className="site-nav" aria-label="Primary navigation"><a className="wordmark" href="/"><span className="mark">K</span>kase</a></nav>
+      <nav className="site-nav" aria-label="Primary navigation"><a className="wordmark" href="/"><KaseMark size={26} /><span>Kase</span></a></nav>
       <section className="docs-page" style={{ maxWidth: '620px', paddingTop: '58px' }}>
       <div className="eyebrow">Secure workspace</div>
       <h1>Sign in to Kase.</h1>

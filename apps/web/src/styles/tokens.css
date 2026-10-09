@@ -1,0 +1,54 @@
+/* Kase brand tokens. The single source of truth for colour, type, radius and
+   motion. The app, the dashboard, and the /brand page all read from here;
+   /brand renders swatches from the computed values, so it cannot drift.
+
+   Kase is dark-only by brand decision: an operator surface, not a document. */
+:root {
+  /* Neutrals, cool and slightly green to sit under the teal. */
+  --ink: #080b0d;
+  --canvas: #0c1013;
+  --surface: #12181c;
+  --surface-raised: #182025;
+  --line: #27343a;
+  --line-strong: #3b4b52;
+  --text: #f2f7f6;
+  --muted: #9bacb0;
+  /* Raised from #718287: the old value sat at ~4.3:1 on ink, under AA. */
+  --quiet: #7d8e93;
+
+  /* One signal colour. Teal marks actions and verified state, nothing else. */
+  --accent: #62d5bb;
+  --accent-hover: #80e3cc;
+  --accent-ink: #06211d;
+
+  /* Severity scale. Used only to label findings and gate outcomes, never as
+     decoration or as a second brand accent. Pass reuses the signal teal. */
+  --sev-critical: #f46a65;
+  --sev-high: #f0905a;
+  --sev-medium: #e6b56b;
+  --sev-low: #8fb4d6;
+  --sev-pass: var(--accent);
+
+  /* Legacy aliases kept so existing components keep working. */
+  --critical: var(--sev-critical);
+  --warning: var(--sev-medium);
+
+  /* Shape: soft 18px containers, 12px controls, full-pill buttons. */
+  --radius: 18px;
+  --radius-small: 12px;
+  --radius-pill: 999px;
+
+  --font-sans: var(--font-inter), system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, "Cascadia Mono", Consolas, monospace;
+
+  /* Entering/exiting elements. Strong ease-out: movement is visible
+     immediately, which is the moment the eye is actually watching. */
+  --ease: cubic-bezier(.16, 1, .3, 1);
+  /* Hover and colour changes, where ease-out overshoots the intent. */
+  --ease-hover: cubic-bezier(.4, 0, .2, 1);
+
+  /* Two tracking values, not seven. Display type needs negative tracking to
+     stop looking loose; body text does not. */
+  --track-tight: -0.02em;
+  --track-snug: -0.01em;
+}

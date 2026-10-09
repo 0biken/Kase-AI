@@ -1,7 +1,96 @@
 import Link from 'next/link';
+import { KaseMark } from '@/components/kase-mark';
+import { Swatch } from './swatch';
+import '../marketing.css';
+import './brand.css';
 
-const palette = [['Ink', '#080B0D'], ['Canvas', '#0C1013'], ['Surface', '#12181C'], ['Kase teal', '#62D5BB'], ['Critical', '#F46A65']];
+const CORE = [
+  ['--ink', 'Ink', 'Page background'],
+  ['--canvas', 'Canvas', 'Section and card ground'],
+  ['--surface', 'Surface', 'Raised panels and inputs'],
+  ['--line', 'Line', 'Hairlines and borders'],
+  ['--text', 'Text', 'Primary copy'],
+  ['--muted', 'Muted', 'Secondary copy'],
+  ['--accent', 'Kase teal', 'Actions and verified state only'],
+] as const;
+
+const SEVERITY = [
+  ['--sev-critical', 'Critical', 'Blocking finding, failed gate'],
+  ['--sev-high', 'High', 'Severity label only'],
+  ['--sev-medium', 'Medium', 'Severity label, warnings'],
+  ['--sev-low', 'Low', 'Severity label only'],
+  ['--sev-pass', 'Pass', 'Same teal as the accent'],
+] as const;
 
 export default function BrandPage() {
-  return <main className="site-shell"><nav className="site-nav" aria-label="Primary navigation"><Link className="wordmark" href="/"><span className="mark">K</span>kase</Link><div className="nav-links"><Link href="/docs">Documentation</Link><Link href="/dashboard">Dashboard</Link><a href="#system" className="nav-cta">Brand system</a></div></nav><section className="docs-page"><div className="eyebrow">Kase brand guide</div><h1>Calm under pressure.</h1><p>Kase visual language is built for teams making consequential release decisions. It is measured, direct, and evidence-led.</p><div className="feature-grid" id="system"><div className="bezel"><div className="bezel-inner proof-card"><div className="eyebrow">Mark</div><div className="gate-word">K<span>.</span></div><h3>A protected frame, reduced to a single letterform.</h3><p className="section-intro">Use the mark with clear space equal to its internal counter. Never stretch, shade, or add a second accent color.</p></div></div><div className="feature-list"><article className="feature-row"><span className="feature-index">A</span><div><h3>Voice</h3><p>Precise, vigilant, actionable. Never theatrical, vague, or alarmist.</p></div></article><article className="feature-row"><span className="feature-index">B</span><div><h3>Typography</h3><p>Variable system sans for product clarity. Monospace is reserved for evidence, identifiers, and operational context.</p></div></article><article className="feature-row"><span className="feature-index">C</span><div><h3>Surface</h3><p>Dark operator surfaces, quiet boundaries, and teal only where an action or verified state deserves focus.</p></div></article></div></div><div className="section-header" style={{ marginTop: 72 }}><div className="eyebrow">Color system</div><h2>One calm signal.</h2></div><div className="docs-directory">{palette.map(([name, color]) => <div className="docs-link" key={name} style={{ borderColor: color === '#62D5BB' ? color : undefined }}><strong>{name}</strong><span>{color}</span><div style={{ marginTop: 18, height: 34, borderRadius: 8, background: color, border: color === '#080B0D' ? '1px solid #3b4b52' : undefined }} /></div>)}</div></section><footer className="footer"><span>kase - brand system</span><div className="footer-links"><Link href="/">Home</Link><Link href="/docs">Documentation</Link></div></footer></main>;
+  return (
+    <main className="lp">
+      <header className="lp-nav-wrap">
+        <nav className="lp-nav" aria-label="Primary navigation">
+          <Link className="wordmark" href="/" aria-label="Kase home"><KaseMark size={26} /><span>Kase</span></Link>
+          <div className="lp-nav-links"><Link href="/">Home</Link><Link href="/docs">Docs</Link></div>
+          <Link className="button button-primary button-small" href="/#waitlist">Join waitlist</Link>
+        </nav>
+      </header>
+
+      <section className="br-intro">
+        <p className="eyebrow">Brand system</p>
+        <h1>Know what ships. <span>Prove why.</span></h1>
+        <p>The primary line. Supporting line, for footers and sign-offs: <em>Every release. Every finding. Every proof.</em></p>
+      </section>
+
+      <section className="lp-section br-block">
+        <h2>Mark</h2>
+        <div className="br-mark-grid">
+          <div className="br-mark-stage br-mark-dark"><KaseMark size={132} title="Kase mark" /></div>
+          <div className="br-mark-stage br-mark-teal"><KaseMark size={132} /></div>
+          <div className="br-mark-stage br-mark-lockup"><span className="wordmark br-lockup"><KaseMark size={56} /><span>Kase</span></span></div>
+        </div>
+        <ul className="br-rules">
+          <li>A K whose lower leg is the handle of a magnifier. Investigation, built into the letter.</li>
+          <li>Use it in one colour: text white on dark, ink on teal. Never two colours inside the mark.</li>
+          <li>Clear space equals the lens diameter. Minimum size 16px for the mark, 20px for the lockup.</li>
+          <li>Do not stretch, rotate, outline, shadow, or place it in a bordered box.</li>
+          <li>The wordmark is set in title case: Kase. Never &ldquo;kase&rdquo; or &ldquo;KASE&rdquo;.</li>
+        </ul>
+      </section>
+
+      <section className="lp-section br-block">
+        <h2>Colour</h2>
+        <p className="lp-section-lede">One signal colour. Teal marks an action or a verified state and nothing else.</p>
+        <div className="br-swatches">{CORE.map(([t, n, u]) => <Swatch key={t} token={t} name={n} use={u} />)}</div>
+        <h3 className="br-sub">Severity</h3>
+        <p className="br-note">Severity colours label findings and gate outcomes. They are never decoration and never a second brand accent.</p>
+        <div className="br-swatches">{SEVERITY.map(([t, n, u]) => <Swatch key={t} token={t} name={n} use={u} />)}</div>
+      </section>
+
+      <section className="lp-section br-block">
+        <h2>Type</h2>
+        <div className="br-type">
+          <div>
+            <p className="br-type-sample">Inter</p>
+            <p className="br-note">Product and marketing copy. Display at 650 to 700 with tight tracking, body at 400.</p>
+          </div>
+          <div>
+            <p className="br-type-sample br-type-mono">JetBrains Mono</p>
+            <p className="br-note">Evidence, identifiers, commands, and exit codes. Never for headlines or body copy.</p>
+          </div>
+        </div>
+      </section>
+
+      <section className="lp-section br-block">
+        <h2>Voice</h2>
+        <dl className="br-voice">
+          <div><dt>Precise</dt><dd>not vague</dd></div>
+          <div><dt>Vigilant</dt><dd>not alarmist</dd></div>
+          <div><dt>Evidence-led</dt><dd>not opinion-led</dd></div>
+        </dl>
+      </section>
+
+      <footer className="lp-footer">
+        <div className="lp-footer-brand"><Link className="wordmark" href="/"><KaseMark size={22} /><span>Kase</span></Link></div>
+        <div className="footer-links"><Link href="/">Home</Link><Link href="/docs">Documentation</Link></div>
+      </footer>
+    </main>
+  );
 }
