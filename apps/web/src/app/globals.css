@@ -135,12 +135,14 @@ button { cursor: pointer; touch-action: manipulation; }
 .ready-item:first-child { border-top: 0; padding-top: 0; }
 .ready-dot { width: 6px; height: 6px; border-radius: 50%; }
 .ready-dot-done { background: var(--accent); }
+.ready-dot-built { background: var(--sev-medium); }
 .ready-dot-next { background: #3b4b52; }
 .ready-text { display: grid; gap: 2px; min-width: 0; }
 .ready-label { color: var(--text); font-size: 13px; }
 .ready-detail { color: var(--quiet); font-size: 12px; }
 .ready-state { font: 500 11px var(--font-mono); letter-spacing: .03em; white-space: nowrap; }
 .ready-state-done { color: var(--accent); }
+.ready-state-built { color: var(--sev-medium); }
 .ready-state-next { color: var(--quiet); }
 
 /* ---- doc links */
