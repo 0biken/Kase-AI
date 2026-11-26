@@ -6,12 +6,12 @@ Executable form of [19 — Roadmap](docs/19-roadmap/README.md). Ordered by depen
 
 **What "done" means from M4 on:** `[x]` = implemented, with passing local tests (unit, contract, or loopback). It does **not** mean live-proven. Live proof is tracked only by the exit criteria and by the gate ledgers ([GATES-M4.md](GATES-M4.md), [GATES-M5.md](GATES-M5.md)). No M4–M7 exit criterion has passed yet, mainly because the live Compose proofs need Docker and provider keys, which this machine doesn't have.
 
-**130 tasks, 81 done, 14 partial** (as of 2026-11-26). Counts are derived from milestone and invariant checkboxes, including exit criteria; the five deferred items are excluded.
+**130 tasks, 84 done, 11 partial** (as of 2026-11-26). Counts are derived from milestone and invariant checkboxes, including exit criteria; the five deferred items are excluded.
 
 | | Phase 0 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | Invariants |
 |---|---|---|---|---|---|---|---|---|---|
-| Done | 15 | 16 | 18 | 9 | 10 | 4 | 9 | 0 | 0 |
-| Partial | – | – | – | – | 3 | 6 | 2 | 3 | – |
+| Done | 15 | 16 | 18 | 9 | 10 | 7 | 9 | 0 | 0 |
+| Partial | – | – | – | – | 3 | 3 | 2 | 3 | – |
 | Total | 15 | 16 | 18 | 9 | 15 | 14 | 16 | 19 | 8 |
 | Exit proven | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | – |
 
@@ -160,11 +160,11 @@ Non-code work that blocks code. ADR-017 closes the provider decision; M4 impleme
 
 > Several assumptions here are already validated by [`spike/correlation/`](spike/correlation/README.md) — route dump, the controller→service walk, symbol-keyed fingerprints, and reachability filtering. This milestone is largely hardening and generalizing that work, not discovering it.
 
-> **Status:** the deterministic core is done. GATES-M5 G1 (correlation core, 39 tests), G2 (bounded code map) and G7 (528 API tests plus `tsc`) pass. G3–G6 are pending: runtime route adapters, durable worker integration, dedup and lifecycle.
+> **Status:** the deterministic core and route-map adapters are done. GATES-M5 G1 (correlation core), G2 (bounded code map), G3 (commit-bound route artifacts, 53 tests) and G7 (543 API tests plus `tsc`) pass. G4–G6 are pending: durable worker integration, dedup and lifecycle.
 
-- [~] `kase-routemap` for NestJS — static source graph in `correlation/nest-source-graph.ts`, resolves explicit and aliased class tokens; still needs packaging as a runtime-dump adapter with commit-bound artifacts (G3)
-- [~] `kase-routemap` for FastAPI — code-map recognises FastAPI; no runtime adapter yet (G3)
-- [~] OpenAPI spec ingest as a deterministic source, ranked above static parse — `ingestOpenApi` and the `runtime_dump > openapi > static_parse` ranking exist; no commit-bound ingestion path (G3)
+- [x] `kase-routemap` for NestJS — runtime dump of the live DI container (`adapters/routemap/nest-route-dump.ts`, runner `routemap-nest-main.ts`), bound to source by `nestSymbolLocator` (G3). Worker-image packaging is part of G4
+- [x] `kase-routemap` for FastAPI — `workers/routemap/fastapi_dump.py` dumps `app.routes`, bound to source by `python-symbols.ts` (G3)
+- [x] OpenAPI spec ingest as a deterministic source, ranked above static parse — commit-bound `kase.routemap/v1` envelope, and `assembleRoutes` records rejected artifacts as failures (G3)
 - [x] Code map builder with symbol resolution — bounded depth, cycles and node counts (G2)
 - [x] Correlation layers 1–3 with `method` recorded per correlation (G1)
 - [x] **Reachability filtering** — static findings on unreachable code must not correlate (G1 negative controls)

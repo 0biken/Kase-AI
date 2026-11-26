@@ -113,3 +113,22 @@ export function buildNestGraph(project: Project, root: string, route: ResolvedRo
   }
   return graph;
 }
+
+/**
+ * Locates `Class.method` handler symbols in the checked-out TypeScript source,
+ * for binding a runtime route dump (which knows the symbol but not the file).
+ * Every declaration is returned, so duplicate class names stay ambiguous and
+ * are rejected by the binder instead of being guessed.
+ */
+export function nestSymbolLocator(project: Project, root: string): (symbol: string) => SymbolLocation[] {
+  const index = new Map<string, SymbolLocation[]>();
+  for (const file of project.getSourceFiles()) for (const cls of file.getClasses()) {
+    if (!cls.getName()) continue;
+    for (const method of cls.getMethods()) {
+      let found: SymbolLocation;
+      try { found = location(method, root); } catch { continue; }
+      index.set(found.enclosingSymbol, [...(index.get(found.enclosingSymbol) ?? []), found]);
+    }
+  }
+  return symbol => [...(index.get(symbol) ?? [])];
+}

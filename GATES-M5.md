@@ -16,8 +16,10 @@ Baseline environment finding: local HTTP and junction tests fail inside the Wind
   CHECK: node scripts/verify-m5-core.mjs
   EXPECT: KASE_M5_CORE_VERIFIED
   EVIDENCE: 2026-11-18; same core run, exit 0 and KASE_M5_CORE_VERIFIED. Includes explicit and aliased Nest class tokens, rejected custom/mismatched tokens, bounded traversal, and production code-map coverage.
-- [ ] G3: NestJS and FastAPI runtime adapters and OpenAPI ingestion supply ranked, commit-bound route artifacts
-  EVIDENCE: pending; full adapter packaging and runtime proof required
+- [x] G3: NestJS and FastAPI runtime adapters and OpenAPI ingestion supply ranked, commit-bound route artifacts
+  CHECK: node scripts/verify-m5-routes.mjs
+  EXPECT: KASE_M5_ROUTES_VERIFIED
+  EVIDENCE: 2026-11-26; exit 0, 2 suites / 53 tests passed; KASE_M5_ROUTES_VERIFIED. Boots the real NestJS fixture with its own @nestjs/core and runs `workers/routemap/fastapi_dump.py` against the real FastAPI spike fixture. Both dumps bind to checked-out source (`InvoiceController.findOne`, `fixture/app.py` `find_one`). Artifacts from another commit, malformed envelopes, unknown fields, paths outside the checkout, unlocated, ambiguous or file-mismatched symbols, and endpoints claimed by two handlers are rejected. OpenAPI binds only through same-checkout static routes, and runtime_dump > openapi > static_parse holds against a conflicting decoy. Packaging the runners into a worker image and scheduling them as audit jobs is part of G4.
 - [ ] G4: durable correlation merges findings through real workers and retains advisory results when build provenance is absent
   EVIDENCE: pending; persistence and live integration required
 - [ ] G5: exact, structural and advisory dedup produce MATCH, POSSIBLE_MATCH and NEW_FINDING with human decisions for ambiguous pairs
@@ -27,6 +29,6 @@ Baseline environment finding: local HTTP and junction tests fail inside the Wind
 - [x] G7: M5 changes pass API regressions and TypeScript compilation
   CHECK: node scripts/verify-m5-regressions.mjs
   EXPECT: KASE_M5_REGRESSIONS_VERIFIED
-  EVIDENCE: 2026-11-18; exit 0, all 66 API suites / 528 tests passed, followed by successful tsc --noEmit; KASE_M5_REGRESSIONS_VERIFIED.
+  EVIDENCE: 2026-11-26; exit 0, all 67 API suites / 543 tests passed, followed by successful tsc --noEmit; KASE_M5_REGRESSIONS_VERIFIED.
 
-Next: G3 runtime adapter packaging and commit-bound route artifact validation. M5 remains incomplete until G3–G6 have implementation and verification evidence.
+Next: G5 three-level dedup and G6 lifecycle with the suppression feed (no Docker needed), then G4: route-map runners in a worker image, a `correlate` job in the graph, and the live compose proof. M5 remains incomplete until G4–G6 have implementation and verification evidence.
