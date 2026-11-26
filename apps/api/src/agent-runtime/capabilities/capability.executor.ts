@@ -3,7 +3,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { AuditTrailService } from '../../audit-trail/audit-trail.service';
 import { AuditEventsService } from '../../audit-events/audit-events.service';
 import { DurableQueueDispatcher } from '../../queue/durable-queue-dispatcher';
-import { deterministicId } from '../../findings/finding-persistence.service';
+import { deterministicId, upsertFindingOccurrence } from '../../findings/finding-persistence.service';
 import { CapabilitySchema, CapabilityArgs } from './capability.schemas';
 import { computeSeverity, computeFingerprint, syntheticRuleKey } from './finding-authority';
 import { MAX_VALIDATION_CORRECTIONS } from '../budget/budget-defaults';
@@ -75,13 +75,10 @@ export class CapabilityExecutor {
             const excerpt = await this.maps.source(auditId, projectId, { file: location.file, symbol: location.enclosingSymbol, maxLines: 1 });
             locations.push({ id: deterministicId('sourceLocation', `${key}:${location.file}:${location.enclosingSymbol}`), file: location.file, enclosingSymbol: location.enclosingSymbol, line: excerpt.startLine, commitSha: audit.buildProvenance.commitSha, verified: false });
           }
-          let identityId = deterministicId('findingIdentity', `${projectId}:${fingerprint}`);
-          let findingId = deterministicId('finding', `${auditId}:${identityId}`);
+          let findingId = '';
           await this.prisma.$transaction(async tx => {
-            const identity = await tx.findingIdentity.upsert({ where: { projectId_fingerprint: { projectId, fingerprint } }, create: { id: identityId, projectId, fingerprint, status: 'new', firstSeenAuditId: auditId, lastSeenAuditId: auditId, occurrences: 1, currentSeverity: severity.severity }, update: { lastSeenAuditId: auditId, currentSeverity: severity.severity } });
-            identityId = identity.id;
-            findingId = deterministicId('finding', `${auditId}:${identityId}`);
-            await tx.finding.upsert({ where: { auditId_identityId: { auditId, identityId } }, create: { id: findingId, auditId, identityId, origin, category: args.category, ruleId, cwe: args.cwe, title: args.title, ...severity, affectedTarget: target, description: args.impact, reproduction: args.reproduction, impact: args.impact, fix: args.remediation, fixPatch: args.remediationPatch, confidenceBand: 'medium', aiGenerated: true, gateEligible: false, sourceLocations: { create: locations }, findingEvidence: { create: ids.map(evidenceId => ({ evidenceId, role: 'primary' })) } }, update: {} });
+            ({ findingId } = await upsertFindingOccurrence(tx, { projectId, auditId, fingerprint, severity: severity.severity,
+              create: { origin, category: args.category, ruleId, cwe: args.cwe, title: args.title, ...severity, affectedTarget: target, description: args.impact, reproduction: args.reproduction, impact: args.impact, fix: args.remediation, fixPatch: args.remediationPatch, confidenceBand: 'medium', aiGenerated: true, gateEligible: false, sourceLocations: { create: locations }, findingEvidence: { create: ids.map(evidenceId => ({ evidenceId, role: 'primary' })) } } }));
             await tx.agentCoverageResult.upsert({ where: { auditId_agentRole_category: { auditId, agentRole, category: args.category } }, create: { id: deterministicId('coverage', `${auditId}:${agentRole}:${args.category}`), auditId, agentRole, category: args.category, outcome: 'finding' }, update: { outcome: 'finding', blockedReason: null } });
           });
           return { success: true, data: { findingId, ...severity, gateEligible: false } };

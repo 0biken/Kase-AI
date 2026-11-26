@@ -1,3 +1,4 @@
+import { gateCategoriesFor } from './gate-categories';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MAX_JOBS_PER_AUDIT } from '../queue/queue.config';
@@ -145,7 +146,9 @@ export class AuditSchedulerService {
       requiredJobsFailed: failed.some((job) => job.required !== false), degradationReasons: reasons,
     });
     assertAuditTransition(audit.status, status);
-    const executedCategories = [...new Set(jobs.filter((job) => job.status === 'succeeded' && job.category).map((job) => job.category!))];
+    const coverage = await tx.agentCoverageResult.findMany({ where: { auditId: audit.id }, select: { agentRole: true, category: true, outcome: true } });
+    const executedCategories = gateCategoriesFor(jobs.filter((job) => job.status === 'succeeded' && job.category).map((job) => job.category!),
+      audit.requestedCategories ?? [], coverage);
     const notExecutedCategories = jobs
       .filter((job) => ['failed', 'timed_out', 'cancelled', 'skipped'].includes(job.status) && job.category)
       .map((job) => ({ category: job.category!, reason: job.status }));

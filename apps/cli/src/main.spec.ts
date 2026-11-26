@@ -72,3 +72,28 @@ test('gate show reads the latest evaluation', async () => {
   assert.match(fetcher.calls[0], /\/audits\/aud_1\/gate$/);
   assert.equal(JSON.parse(output[0]).outcome, 'pass');
 });
+
+test('imports security-audit findings.json to the flat audit import route', async () => {
+    const { mkdtemp, writeFile, rm } = await import('node:fs/promises');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const dir = await mkdtemp(join(tmpdir(), 'kase-import-'));
+    try {
+      const file = join(dir, 'findings.json');
+      await writeFile(file, JSON.stringify([{ verdict: 'rejected' }]));
+      const bodies: string[] = [];
+      const fetcher = (async (url: RequestInfo | URL, init?: RequestInit) => {
+        bodies.push(`${String(url)} ${init?.method} ${init?.body}`);
+        return response({ imported: 0, rejected: 1 });
+      }) as typeof fetch;
+      const output: string[] = [];
+      const code = await run(['import', 'security-audit', '--audit', 'aud_1', file, '--json'], env, { out: (v) => output.push(v), err: () => undefined }, fetcher);
+      assert.equal(code, 0);
+      assert.equal(bodies[0], 'http://kase/api/v1/audits/aud_1/import/security-audit POST [{"verdict":"rejected"}]');
+      assert.equal(JSON.parse(output[0]).rejected, 1);
+    } finally { await rm(dir, { recursive: true, force: true }); }
+  });
+
+test('import security-audit requires --audit and a file', async () => {
+    await assert.rejects(run(['import', 'security-audit', '--audit', 'aud_1'], env, { out: () => undefined, err: () => undefined }, sequenceFetch([])), /Usage: kase import security-audit/);
+  });

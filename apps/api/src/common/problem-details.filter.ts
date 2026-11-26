@@ -57,6 +57,21 @@ export class ProblemDetailsFilter implements ExceptionFilter {
       return this.fromHttpException(exception, instance);
     }
 
+    // Express body-parser failures (oversized or malformed bodies) arrive as plain errors carrying a
+    // client status. They are the caller's fault, so report that status rather than a 500.
+    const parser = bodyParserError(exception);
+    if (parser) {
+      const code: ErrorCode = parser.status === HttpStatus.PAYLOAD_TOO_LARGE ? 'PAYLOAD_TOO_LARGE' : this.inferCode(parser.status);
+      return {
+        type: typeUriFor(code),
+        title: ERROR_CODES[code].title,
+        status: parser.status,
+        detail: parser.message,
+        ...(instance ? { instance } : {}),
+        code,
+      };
+    }
+
     return {
       type: typeUriFor('INTERNAL'),
       title: ERROR_CODES.INTERNAL.title,
@@ -154,4 +169,17 @@ function groupValidationMessages(messages: string[]): Record<string, string[]> {
     (grouped[field] ??= []).push(message);
   }
   return grouped;
+}
+
+/**
+ * Recognises errors raised by Express's body-parser: they carry a `type` such
+ * as `entity.too.large` or `entity.parse.failed`, a 4xx `status`, and
+ * `expose: true`, meaning their message is safe to show the client.
+ */
+function bodyParserError(exception: unknown): { status: number; message: string } | null {
+  if (!(exception instanceof Error)) return null;
+  const e = exception as Error & { type?: unknown; status?: unknown; expose?: unknown };
+  if (typeof e.type !== 'string' || !e.type.startsWith('entity.') || e.expose !== true) return null;
+  if (typeof e.status !== 'number' || e.status < 400 || e.status >= 500) return null;
+  return { status: e.status, message: e.message };
 }

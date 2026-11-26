@@ -88,6 +88,11 @@ async function main() {
   const blackbox = await extractSkill('blackbox', SKILL_FILES.blackbox, BLACKBOX_DIR);
   const whitebox = await extractSkill('whitebox', SKILL_FILES.whitebox, WHITEBOX_DIR);
 
+  // Preserve the vendored security-audit module (scripts/vendor-security-audit.mjs owns these entries).
+  let previous = {};
+  try { previous = JSON.parse(await fs.readFile(path.join(METHODOLOGY_DIR, 'manifest.json'), 'utf8')); } catch { /* first run */ }
+  const securityFiles = Object.fromEntries(Object.entries(previous.referenceFiles ?? {}).filter(([k]) => k.startsWith('security/')));
+
   const manifest = {
     version: '1.0.0',
     archiveDigests: {
@@ -97,9 +102,11 @@ async function main() {
     referenceFiles: {
       ...blackbox.files,
       ...whitebox.files,
+      ...securityFiles,
     },
+    ...(previous.upstreamSecurityAudit ? { upstreamSecurityAudit: previous.upstreamSecurityAudit } : {}),
     upstreamSkillVersion: '1.0.0',
-    kasePromptVersion: 'm4-1.0.0',
+    kasePromptVersion: previous.kasePromptVersion ?? 'm4-1.0.0',
   };
 
   await fs.writeFile(

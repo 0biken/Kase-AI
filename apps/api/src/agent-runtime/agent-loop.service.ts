@@ -34,7 +34,7 @@ export class AgentLoopService {
     const context = { auditId, role, targetId: snapshot.audit.targetId, requestedCategories: snapshot.audit.requestedCategories,
       remainingCalls: snapshot.budgetMaxCalls, remainingTokens: snapshot.budgetTotalTokens };
     let messages = (await this.transcripts.load(run.id))?.messages ?? [
-      this.prompts.buildSystemPrompt(role, context),
+      this.prompts.buildSystemPrompt(role, context, role === 'whitebox' && snapshot.audit.requestedCategories.includes('security') ? ['security'] : []),
       { role: 'user' as const, content: [{ type: 'text' as const, text: role === 'blackbox'
         ? 'Audit the target using the endpoint inventory and available test identities. Investigate supported categories, record evidence-backed findings, passing checks and blocked coverage, then finish.'
         : 'Audit the repository at the frozen commit using the route map and bounded source excerpts. Investigate supported categories and record evidence-backed findings, passing checks and blocked coverage, then finish.' }] },
@@ -193,7 +193,8 @@ export class AgentLoopService {
       const text = output.filter(e => e.type === 'text_delta').map(e => e.text).join('');
       const content: ProviderMessage['content'][number][] = [];
       if (text) content.push({ type: 'text', text: this.transcripts.redact(auditId, text) });
-      for (const call of calls) content.push({ type: 'tool_use', toolCallId: call.toolCallId, name: call.name, arguments: this.transcripts.redactJson(auditId, call.arguments) });
+      for (const call of calls) content.push({ type: 'tool_use', toolCallId: call.toolCallId, name: call.name, arguments: this.transcripts.redactJson(auditId, call.arguments),
+        ...(call.providerState ? { providerState: call.providerState } : {}) });
       if (!content.length) content.push({ type: 'text', text: 'Provider completed without content' });
       messages.push({ role: 'assistant', content });
       await this.transcripts.checkpoint(run.id, turn, { messages }, turn + 1);

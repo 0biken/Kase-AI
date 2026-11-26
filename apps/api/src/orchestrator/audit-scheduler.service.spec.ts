@@ -23,6 +23,33 @@ describe('orchestrator durable scheduler', () => {
     expect(queues.enqueue).toHaveBeenCalledTimes(1);
   });
 
+  it('records gate categories from succeeded jobs and the agents\' own coverage when the graph settles', async () => {
+    const jobs = [
+      { id: 'prov', auditId: 'aud', kind: 'build_provenance', category: null, status: 'succeeded', dependsOn: [], attempts: 1, maxRetries: 2, timeoutMs: 1, required: true },
+      { id: 'sast', auditId: 'aud', kind: 'semgrep', category: 'sast', status: 'succeeded', dependsOn: ['prov'], attempts: 1, maxRetries: 2, timeoutMs: 1, required: true },
+      { id: 'wb', auditId: 'aud', kind: 'whitebox_agent', category: 'whitebox', status: 'succeeded', dependsOn: ['sast'], attempts: 1, maxRetries: 1, timeoutMs: 1, required: true },
+    ];
+    const tx = {
+      $queryRawUnsafe: jest.fn(),
+      audit: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'aud', projectId: 'prj', status: 'running', degraded: false, degradationReasons: [], requestedCategories: ['whitebox', 'security'] }),
+        update: jest.fn(),
+      },
+      auditJob: { findMany: jest.fn().mockResolvedValue(jobs), update: jest.fn() },
+      agentCoverageResult: { findMany: jest.fn().mockResolvedValue([
+        { agentRole: 'whitebox', category: 'authorization', outcome: 'passed' },
+        { agentRole: 'security_audit_import', category: 'security', outcome: 'finding' },
+      ]) },
+      auditEvent: { create: jest.fn(), findFirst: jest.fn(), aggregate: jest.fn().mockResolvedValue({ _max: { sequence: 0 } }) },
+    };
+    const prisma: any = { $transaction: jest.fn((fn) => fn(tx)), auditJob: { update: jest.fn() } };
+    const scheduler = new AuditSchedulerService(prisma, { enqueue: jest.fn() } as never, { reclaimExpired: jest.fn() } as never);
+    await scheduler.advance('aud').catch(() => undefined);
+    expect(tx.agentCoverageResult.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { auditId: 'aud' } }));
+    const executed = tx.audit.update.mock.calls[0][0].data.executedCategories;
+    expect(executed).toEqual(expect.arrayContaining(['sast', 'static_security', 'whitebox', 'authz', 'security']));
+  });
+
   it('claims once, increments attempts, and establishes a renewable lease', async () => {
     const tx = {
       $queryRawUnsafe: jest.fn(),

@@ -3,12 +3,16 @@ import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { ProblemDetailsFilter } from './common/problem-details.filter';
+import { applyRouteBodyLimits } from './common/route-body-limits';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
   // 14-api §1: "Base | /api/v1" and "Versioning | URL-versioned".
   app.setGlobalPrefix('api/v1');
+
+  // Larger JSON bodies for specific routes only (security-audit import); everything else keeps the default.
+  applyRouteBodyLimits(app);
 
   app.useGlobalPipes(
     new ValidationPipe({

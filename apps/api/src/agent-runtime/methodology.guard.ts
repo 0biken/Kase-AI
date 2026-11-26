@@ -5,6 +5,9 @@ import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
 import { ProblemException } from '../common/problem-details';
 
+/** Role directories plus the opt-in `security` module (vendored cloudflare/security-audit-skill references). */
+export const METHODOLOGY_DIRS = ['blackbox', 'whitebox', 'security'];
+
 export function methodologyRoot(): string {
   if (process.env.KASE_METHODOLOGY_ROOT) return resolve(process.env.KASE_METHODOLOGY_ROOT);
   for (const root of [process.cwd(), resolve(process.cwd(), '../..')]) {
@@ -20,14 +23,14 @@ export class MethodologyGuard {
     try {
       const base = methodologyRoot();
       const rootEntries = await readdir(base, { withFileTypes: true });
-      if (rootEntries.length !== 3 || rootEntries.some(e =>
-        e.name === 'manifest.json' ? !e.isFile() : !['blackbox', 'whitebox'].includes(e.name) || !e.isDirectory()))
+      if (rootEntries.length !== 1 + METHODOLOGY_DIRS.length || rootEntries.some(e =>
+        e.name === 'manifest.json' ? !e.isFile() : !METHODOLOGY_DIRS.includes(e.name) || !e.isDirectory()))
         throw new Error('Unexpected methodology root entry');
       const raw = await readFile(join(base, 'manifest.json'), 'utf8');
       const manifest = JSON.parse(raw);
       if (!manifest.kasePromptVersion || !manifest.referenceFiles) throw new Error('Invalid manifest');
       const actual: string[] = [];
-      for (const role of ['blackbox', 'whitebox']) {
+      for (const role of METHODOLOGY_DIRS) {
         for (const entry of await readdir(join(base, role), { withFileTypes: true })) {
           if (!entry.isFile()) throw new Error('Unexpected methodology entry');
           actual.push(role + '/' + entry.name);

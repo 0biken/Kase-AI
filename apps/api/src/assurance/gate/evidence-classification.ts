@@ -24,6 +24,8 @@ const TYPE_TO_CLASS: Readonly<Record<string, EvidenceClass>> = {
   trace: 'trace',
   console_log: 'console_log',
   ai_inference: 'ai_inference',
+  // Imported security-audit skill output is an AI-produced claim; it can warn but never block.
+  security_audit_json: 'ai_inference',
   prose: 'prose',
 };
 

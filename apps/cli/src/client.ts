@@ -76,6 +76,10 @@ export class KaseClient {
     return this.request(`/audits/${auditId}/gate`);
   }
 
+  importSecurityAudit(auditId: string, findings: unknown): Promise<Record<string, unknown>> {
+    return this.request(`/audits/${auditId}/import/security-audit`, { method: 'POST', body: JSON.stringify(findings) });
+  }
+
   listFindings(auditId: string, filters: Record<string, string | undefined>): Promise<unknown> {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(filters)) if (value) query.set(key, value);

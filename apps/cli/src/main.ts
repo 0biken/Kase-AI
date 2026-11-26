@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
 import { ApiError, AuditRecord, GateDecision, GateOutcome, KaseClient, resolveNamed, resolveProject } from './client';
 
@@ -22,7 +23,21 @@ export async function run(argv: string[], env: NodeJS.ProcessEnv, io: Io, fetche
   if (group === 'findings' && action === 'list') return listFindings(client, rest, io);
   if (group === 'gate' && action === 'evaluate') return evaluateGate(client, rest, io);
   if (group === 'gate' && action === 'show') return showGate(client, rest, io);
-  throw new Error('Usage: kase audit start ... | kase findings list ... | kase gate evaluate|show ...');
+  if (group === 'import' && action === 'security-audit') return importSecurityAudit(client, rest, io);
+  throw new Error('Usage: kase audit start ... | kase findings list ... | kase gate evaluate|show ... | kase import security-audit ...');
+}
+
+/** Imports cloudflare/security-audit-skill `findings.json`; imported findings are warn-only and never gate-eligible. */
+async function importSecurityAudit(client: KaseClient, args: string[], io: Io): Promise<number> {
+  const parsed = parseArgs({ args, strict: true, allowPositionals: true,
+    options: { audit: { type: 'string' }, json: { type: 'boolean', default: false } } });
+  const file = parsed.positionals[0];
+  if (!parsed.values.audit || !file) throw new Error('Usage: kase import security-audit --audit <id> <findings.json>');
+  let body: unknown;
+  try { body = JSON.parse(await readFile(file, 'utf8')); }
+  catch (error) { throw new Error(`Cannot read ${file} as JSON: ${error instanceof Error ? error.message : String(error)}`); }
+  emit(io, parsed.values.json!, await client.importSecurityAudit(parsed.values.audit, body));
+  return 0;
 }
 
 async function evaluateGate(client: KaseClient, args: string[], io: Io): Promise<number> {
@@ -64,8 +79,8 @@ async function startAudit(client: KaseClient, args: string[], io: Io): Promise<n
   }}).values;
   if (!parsed.project || !parsed.target) throw new Error('--project and --target are required');
   if (!['smoke', 'security', 'full'].includes(parsed.mode!)) throw new Error('--mode must be smoke, security, or full');
-  // Valid categories: sast, http, blackbox, whitebox (M4)
-  const validCategories = ['sast', 'http', 'blackbox', 'whitebox'];
+  // Valid categories: sast, http, blackbox, whitebox (M4); security adds the security-audit methodology to the whitebox agent
+  const validCategories = ['sast', 'http', 'blackbox', 'whitebox', 'security'];
   if (parsed.categories) {
     const cats = parsed.categories.split(',').filter(Boolean);
     const invalid = cats.filter(c => !validCategories.includes(c));

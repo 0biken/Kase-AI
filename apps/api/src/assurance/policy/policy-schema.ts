@@ -130,7 +130,8 @@ export const DEFAULT_GATE_POLICY: ParsedPolicy = parsePolicy({
     { correlation_method: ['ai_inference'] },
     { provenance_unverified: true },
   ],
-  required_categories: ['security', 'authz', 'static_security', 'dependencies'],
+  // `dependencies` joins this list with the M7 deps adapter; until then nothing can execute it.
+  required_categories: ['security', 'authz', 'static_security'],
   fail_closed: {
     audit_status: ['failed', 'partial'],
     provenance_verified: 'false_blocks_correlated_findings_only',

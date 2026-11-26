@@ -2,10 +2,16 @@ import { Module } from '@nestjs/common';
 import { FindingsController, FlatFindingsController } from './findings.controller';
 import { FindingsService } from './findings.service';
 import { FindingPersistenceService } from './finding-persistence.service';
+import { SecurityAuditImportController } from './security-audit-import.controller';
+import { SecurityAuditImportService } from './security-audit-import.service';
+import { EvidenceModule } from '../evidence/evidence.module';
+import { RetentionModule } from '../retention/retention.module';
+import { StorageModule } from '../storage/storage.module';
 
 @Module({
-  controllers: [FindingsController, FlatFindingsController],
-  providers: [FindingsService, FindingPersistenceService],
+  imports: [EvidenceModule, RetentionModule, StorageModule],
+  controllers: [FindingsController, FlatFindingsController, SecurityAuditImportController],
+  providers: [FindingsService, FindingPersistenceService, SecurityAuditImportService],
   exports: [FindingPersistenceService],
 })
 export class FindingsModule {}
