@@ -437,6 +437,12 @@ model FindingIdentity {
   occurrences      Int
   currentSeverity  String
   waiverId         String?
+  /// Set by a human lifecycle decision (false_positive, accepted_risk, reopen, confirm_fixed).
+  statusChangedAt      DateTime?
+  statusDecidedBy      String?
+  statusReason         String?
+  /// Set when a reviewer confirms a POSSIBLE_MATCH and this identity is merged away.
+  mergedIntoIdentityId String?
 
   project  Project   @relation(fields: [projectId], references: [id])
   findings Finding[]
@@ -680,9 +686,16 @@ model FindingRelation {
   kind           String // 'match' | 'possible_match' | 'correlated_with'
   confidenceBand String?
   createdAt      DateTime @default(now())
+  projectId      String?
+  level          Int? // dedup level that produced the row: 1 | 2 | 3
+  status         String    @default("auto") // 'auto' | 'pending' | 'confirmed' | 'rejected'
+  decidedBy      String?
+  decidedAt      DateTime?
+  rationale      String?
 
   @@unique([fromFindingId, toFindingId, kind])
   @@index([toFindingId])
+  @@index([projectId, kind, status])
 }
 
 // ---------------------------------------------------------------------------
