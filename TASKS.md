@@ -4,12 +4,18 @@ Executable form of [19 — Roadmap](docs/19-roadmap/README.md). Ordered by depen
 
 **Legend:** `[x]` done · `[~]` partially done · `[ ]` not started · **⚠** blocks other work
 
-**130 tasks, 59 done.** Counts are derived from milestone and invariant checkboxes, including exit criteria; the five deferred items are excluded.
+**What "done" means from M4 on:** `[x]` = implemented, with passing local tests (unit, contract, or loopback). It does **not** mean live-proven. Live proof is tracked only by the exit criteria and by the gate ledgers ([GATES-M4.md](GATES-M4.md), [GATES-M5.md](GATES-M5.md)). No M4–M7 exit criterion has passed yet, mainly because the live Compose proofs need Docker and provider keys, which this machine doesn't have.
+
+**130 tasks, 81 done, 14 partial** (as of 2026-11-26). Counts are derived from milestone and invariant checkboxes, including exit criteria; the five deferred items are excluded.
 
 | | Phase 0 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | Invariants |
 |---|---|---|---|---|---|---|---|---|---|
-| Done | 15 | 16 | 18 | 9 | 1 | 0 | 0 | 0 | 0 |
+| Done | 15 | 16 | 18 | 9 | 10 | 4 | 9 | 0 | 0 |
+| Partial | – | – | – | – | 3 | 6 | 2 | 3 | – |
 | Total | 15 | 16 | 18 | 9 | 15 | 14 | 16 | 19 | 8 |
+| Exit proven | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | – |
+
+The implementation plan for what's left is in [PLAN-M4-M7.md](PLAN-M4-M7.md).
 
 ---
 
@@ -121,28 +127,30 @@ Non-code work that blocks code. ADR-017 closes the provider decision; M4 impleme
 
 **Goal:** the black-box agent finds the seeded IDOR unaided and files a schema-valid finding.
 
+> **Status:** code complete locally; GATES-M4 local checks L1–L4 pass (28 / 25 / 24 cases, zero skips). Live gates G1–G6 are pending: no Docker engine, no provider keys. See [M4-REPAIR-REPORT.md](M4-REPAIR-REPORT.md).
+
 ### Provider layer
-- [ ] `AIProvider` abstraction, model pinning, prompt caching
-- [ ] Token/call/wall-clock budget accounting per audit
-- [ ] GREEN/YELLOW/RED degradation ladder ([11](docs/11-ai-layer/README.md))
-- [ ] **Degradation sets `degraded: true`** — a budget overrun must never silently become a green build
+- [x] `AIProvider` abstraction, model pinning, prompt caching — Anthropic, OpenAI and Gemini adapters; Anthropic sets cache control, the other two report cached tokens; loopback HTTP/SSE contract suite (L1)
+- [~] Token/call/wall-clock budget accounting per audit — `budget.service.ts` with reservations and settlement; local L2 passes; the PostgreSQL concurrency proof (`scripts/m4-database-proof.mjs`) hasn't run
+- [x] GREEN/YELLOW/RED degradation ladder ([11](docs/11-ai-layer/README.md)) — transitions are recorded as `budget.transition` audit events
+- [x] **Degradation sets `degraded: true`** — a budget overrun must never silently become a green build
 
 ### Capability contract ⚠
-- [ ] Typed capabilities only — no shell passthrough, no command-shaped `request_tool`
-- [ ] `create_finding`, `attach_evidence`, `get_source`, `get_route_map`
-- [ ] `record_passing_check` — distinguishes "tested and clean" from "never tested"
-- [ ] `report_blocked` — required for the "category failed to execute" gate condition
-- [ ] `request_scope_change` — denied and logged, never silently honored
-- [ ] Schema validation on every agent output with structured error feedback and bounded retries
+- [x] Typed capabilities only — no shell passthrough, no command-shaped `request_tool` (L3)
+- [x] `create_finding`, `attach_evidence`, `get_source`, `get_route_map`
+- [x] `record_passing_check` — distinguishes "tested and clean" from "never tested"
+- [x] `report_blocked` — required for the "category failed to execute" gate condition
+- [x] `request_scope_change` — denied and logged, never silently honored (`agent.scope_change.denied` audit-trail event)
+- [x] Schema validation on every agent output with structured error feedback and bounded retries
 
 ### Methodology
 - [x] Vendor `references/` payloads from both `.skill` archives as the methodology corpus
-- [ ] Black-box agent loop over the endpoint inventory
-- [ ] White-box agent loop over the code map
+- [~] Black-box agent loop over the endpoint inventory — implemented and tested against a deterministic provider fixture; no live run yet (G5/G6)
+- [~] White-box agent loop over the code map — implemented; no live run yet
 
 **Exit criteria**
-- [ ] The black-box agent independently discovers the seeded IDOR and files a schema-valid finding carrying replayable evidence
-- [ ] An agent attempting an out-of-scope action is denied, and the denial appears in the audit log
+- [ ] The black-box agent independently discovers the seeded IDOR and files a schema-valid finding carrying replayable evidence — GATES-M4 G6 (real provider), blocked on keys and Docker
+- [ ] An agent attempting an out-of-scope action is denied, and the denial appears in the audit log — denial path is unit-tested; live containment is GATES-M4 G3/G5
 
 ---
 
@@ -152,22 +160,24 @@ Non-code work that blocks code. ADR-017 closes the provider decision; M4 impleme
 
 > Several assumptions here are already validated by [`spike/correlation/`](spike/correlation/README.md) — route dump, the controller→service walk, symbol-keyed fingerprints, and reachability filtering. This milestone is largely hardening and generalizing that work, not discovering it.
 
-- [ ] `kase-routemap` for NestJS — **spike-validated**, needs packaging as a real adapter
-- [ ] `kase-routemap` for FastAPI
-- [ ] OpenAPI spec ingest as a deterministic source, ranked above static parse
-- [ ] Code map builder with symbol resolution — **spike-validated**, needs depth/cycle limits at scale
-- [ ] Correlation layers 1–3 with `method` recorded per correlation
-- [ ] **Reachability filtering** — static findings on unreachable code must not correlate (found by the spike, not in the original design)
+> **Status:** the deterministic core is done. GATES-M5 G1 (correlation core, 39 tests), G2 (bounded code map) and G7 (528 API tests plus `tsc`) pass. G3–G6 are pending: runtime route adapters, durable worker integration, dedup and lifecycle.
+
+- [~] `kase-routemap` for NestJS — static source graph in `correlation/nest-source-graph.ts`, resolves explicit and aliased class tokens; still needs packaging as a runtime-dump adapter with commit-bound artifacts (G3)
+- [~] `kase-routemap` for FastAPI — code-map recognises FastAPI; no runtime adapter yet (G3)
+- [~] OpenAPI spec ingest as a deterministic source, ranked above static parse — `ingestOpenApi` and the `runtime_dump > openapi > static_parse` ranking exist; no commit-bound ingestion path (G3)
+- [x] Code map builder with symbol resolution — bounded depth, cycles and node counts (G2)
+- [x] Correlation layers 1–3 with `method` recorded per correlation (G1)
+- [x] **Reachability filtering** — static findings on unreachable code must not correlate (G1 negative controls)
 - [ ] Layer 4 AI inference as **advisory only**, ordinal confidence, never numeric thresholds
-- [ ] Fingerprinting on deterministic inputs only — **spike-validated**
-- [ ] Three-level dedup: exact → semantic → AI-assisted, emitting `MATCH`/`POSSIBLE_MATCH`/`NEW_FINDING`
+- [x] Fingerprinting on deterministic inputs only — SHA-256 over structural inputs in `correlation-engine.service.ts`
+- [~] Three-level dedup: exact → semantic → AI-assisted, emitting `MATCH`/`POSSIBLE_MATCH`/`NEW_FINDING` — `FindingRelation` schema only; no matcher (G5)
 - [ ] `POSSIBLE_MATCH` routes to a human queue, never auto-resolves
-- [ ] Finding lifecycle: `NEW`, `OPEN`, `FIXED`, `VERIFIED`, `REGRESSED`, `NOT_REPRODUCED`, `FALSE_POSITIVE`, `ACCEPTED_RISK`
-- [ ] Suppression store keyed on fingerprint, fed by `FALSE_POSITIVE`
+- [~] Finding lifecycle: `NEW`, `OPEN`, `FIXED`, `VERIFIED`, `REGRESSED`, `NOT_REPRODUCED`, `FALSE_POSITIVE`, `ACCEPTED_RISK` — statuses exist on `FindingIdentity`; no authorized transition service or API (G6)
+- [~] Suppression store keyed on fingerprint, fed by `FALSE_POSITIVE` — fingerprint-keyed store and API exist (M6 Workstream C); not yet fed by a lifecycle transition
 
 **Exit criteria**
-- [ ] The fixture's IDOR produces exactly one correlated finding pointing at the service method, with both evidence artifacts preserved
-- [ ] Removing build provenance downgrades it to advisory without losing the finding
+- [ ] The fixture's IDOR produces exactly one correlated finding pointing at the service method, with both evidence artifacts preserved — proven in unit tests against the real fixture source; not yet through real workers (G4)
+- [ ] Removing build provenance downgrades it to advisory without losing the finding — the gate engine does the downgrade; end-to-end proof is G4
 
 ---
 
@@ -175,25 +185,27 @@ Non-code work that blocks code. ADR-017 closes the provider decision; M4 impleme
 
 **Goal:** the vertical slice blocks a PR and explains itself.
 
+> **Status:** gate core, policy and waivers are committed (`47e8f74`, `fab9e90`, `9fe2706`, `cfb4825`, `cc6a6e4`). Still missing: the live replay adapter, report generation, the GitHub App and Actions. There is no GATES-M6 ledger yet.
+
 ### Gate ⚠
-- [ ] Policy engine with per-project configurable policies
-- [ ] **Evidence-class gating** — only replayable artifacts can block; AI-only findings warn ([ADR-002](docs/20-adr/README.md))
-- [ ] Replay verification before any block
-- [ ] Gate outcomes: `PASS`, `FAIL`, `PARTIAL` — **`PARTIAL` is never `PASS`** ([ADR-007](docs/20-adr/README.md))
-- [ ] Fail closed on orchestrator crash, worker timeout, or required category not executed
-- [ ] Gate result records policy used, blocking finding IDs, audit ID, commit SHA, timestamp
+- [x] Policy engine with per-project configurable policies — DSL schema, pure deterministic `gate-engine.ts`, versioned `GatePolicy` CRUD
+- [x] **Evidence-class gating** — only replayable artifacts can block; AI-only findings warn ([ADR-002](docs/20-adr/README.md)) — `evidence-classification.ts`; non-replayable matches are downgraded to warnings
+- [~] Replay verification before any block — `ReplayVerifier` port is wired, and its default fails closed (returns `error`, so the block stands); the real sandboxed HTTP re-issue adapter isn't built
+- [x] Gate outcomes: `PASS`, `FAIL`, `PARTIAL` — **`PARTIAL` is never `PASS`** ([ADR-007](docs/20-adr/README.md))
+- [x] Fail closed on orchestrator crash, worker timeout, or required category not executed — enforced at gate evaluation (`notExecutedCategories`, degraded audits)
+- [x] Gate result records policy used, blocking finding IDs, audit ID, commit SHA, timestamp — `GateEvaluation` model
 
 ### Waivers
-- [ ] Fingerprint-scoped, never finding-ID-scoped
-- [ ] Mandatory expiry — no permanent ignore
-- [ ] Requester ≠ approver as configurable policy
-- [ ] Expiry warnings surfaced ~7 days ahead in report and integrations
+- [x] Fingerprint-scoped, never finding-ID-scoped
+- [x] Mandatory expiry — no permanent ignore (`max_duration_days`, default 30)
+- [x] Requester ≠ approver as configurable policy (`require_separate_approver`)
+- [~] Expiry warnings surfaced ~7 days ahead in report and integrations — `warn_before_expiry_days: 7` is in the policy and the CLI shows days remaining; there's no report or integration yet to surface it in
 
 ### Output
 - [ ] Report generation following the skills' report structure, executive summary built last
 - [ ] GitHub App: PR comment, check run
 - [ ] GitHub Actions workflow and published action
-- [ ] `kase gate evaluate` with explainable output — cites rule, evidence, source location
+- [x] `kase gate evaluate` with explainable output — cites rule, evidence, source location (also `kase gate show`; exit code follows the outcome)
 
 **Exit criteria**
 - [ ] A PR against the fixture is blocked by the correlated finding, and the check run explains why in terms a developer can act on
@@ -205,12 +217,14 @@ Non-code work that blocks code. ADR-017 closes the provider decision; M4 impleme
 
 **Goal:** a real project can be onboarded and run without operator assistance.
 
+> **Status:** dashboard shell has started (`e6f95a8`). Audits list, audit detail, findings and gate panel read the real API through `lib/kase-api`, and there's a dev-only fixture preview. Nothing else in M7 has started. Outside this checklist, the marketing landing page, waitlist and brand system (`1b1665e`) and the security-audit import (`kase import security-audit`) are built.
+
 ### Dashboard
 - [ ] Projects list and detail
-- [ ] Audit detail with live progress over SSE
-- [ ] Findings list with severity/category/status filters
+- [~] Audit detail with live progress over SSE — audit detail page exists; the API has an SSE endpoint (`audit-events.controller.ts`), but the page doesn't subscribe to it
+- [~] Findings list with severity/category/status filters — list page exists; filters not verified
 - [ ] Finding detail: evidence viewer, correlation chain, source excerpt
-- [ ] Gate status and history
+- [~] Gate status and history — `gate-panel.tsx` shows the current outcome; no history
 - [ ] Waiver management with expiry visibility
 - [ ] Endpoint inventory with cross-audit drift
 
