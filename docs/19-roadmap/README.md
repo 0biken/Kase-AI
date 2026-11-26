@@ -109,6 +109,8 @@ M3 is complete. The static recovery suite, fresh six-migration deployment, and r
 
 **Exit:** the black-box agent finds the seeded IDOR unaided and files a schema-valid finding with replayable evidence.
 
+M4 is implemented but not proven. Local checks L1–L4 in [GATES-M4.md](../../GATES-M4.md) pass; live gates G1–G6 are pending on a Docker Linux engine and provider keys.
+
 ### M5 — Correlation (weeks 13–15)
 
 - `kase-routemap` for NestJS and FastAPI
@@ -119,6 +121,8 @@ M3 is complete. The static recovery suite, fresh six-migration deployment, and r
 - Finding lifecycle including `not_reproduced`, `false_positive`, `accepted_risk`
 
 **Exit:** the black-box IDOR and the white-box finding merge into one correlated finding with a verified source location. **This is the thesis proven.**
+
+M5 is partly implemented. The deterministic correlation core and bounded code map pass ([GATES-M5.md](../../GATES-M5.md) G1, G2, G7); route adapters, durable worker integration, dedup and lifecycle (G3–G6) remain.
 
 ### M6 — Release assurance (weeks 16–18)
 
@@ -132,6 +136,8 @@ M3 is complete. The static recovery suite, fresh six-migration deployment, and r
 
 **Exit:** the vertical slice blocks a PR and explains itself.
 
+M6 is partly implemented. The gate engine, versioned policies, evidence-class gating, waivers and `kase gate evaluate` are in place; live replay, reports, the GitHub App and the PR proof remain ([GATES-M6.md](../../GATES-M6.md)).
+
 ### M7 — Surface (weeks 19–22)
 
 - Dashboard: projects, audit detail with SSE, findings, finding detail, gate, waivers, inventory
@@ -141,6 +147,8 @@ M3 is complete. The static recovery suite, fresh six-migration deployment, and r
 - Observability: metrics, traces, alerts, product-health dashboard
 
 **Exit:** a real project can be onboarded and run without operator assistance.
+
+M7 has barely started: an audit, findings and gate dashboard shell reads the real API. See [PLAN-M4-M7.md](../../PLAN-M4-M7.md) for the remaining work.
 
 ## 4. Priorities
 

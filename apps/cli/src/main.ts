@@ -1,6 +1,7 @@
 #!/usr/bin/env node
+import { readFile } from 'node:fs/promises';
 import { parseArgs } from 'node:util';
-import { ApiError, AuditRecord, KaseClient, resolveNamed, resolveProject } from './client';
+import { ApiError, AuditRecord, GateDecision, GateOutcome, KaseClient, resolveNamed, resolveProject } from './client';
 
 export interface Io {
   out(value: string): void;
@@ -11,13 +12,63 @@ const terminalExit: Record<AuditRecord['status'], number> = {
   queued: 0, running: 0, completed: 0, partial: 2, failed: 5, cancelled: 130,
 };
 
+// CI exit codes for a gate outcome (12-policy-gate §6): PASS 0, FAIL 1, PARTIAL 2.
+const gateExit: Record<GateOutcome, number> = { pass: 0, fail: 1, partial: 2 };
+
 export async function run(argv: string[], env: NodeJS.ProcessEnv, io: Io, fetcher: typeof fetch = fetch): Promise<number> {
   const [group, action, ...rest] = argv;
   if (!env.KASE_TOKEN) throw new Error('KASE_TOKEN is required');
   const client = new KaseClient(env.KASE_API_URL ?? 'http://localhost:3002/api/v1', env.KASE_TOKEN, fetcher);
   if (group === 'audit' && action === 'start') return startAudit(client, rest, io);
   if (group === 'findings' && action === 'list') return listFindings(client, rest, io);
-  throw new Error('Usage: kase audit start ... | kase findings list ...');
+  if (group === 'gate' && action === 'evaluate') return evaluateGate(client, rest, io);
+  if (group === 'gate' && action === 'show') return showGate(client, rest, io);
+  if (group === 'import' && action === 'security-audit') return importSecurityAudit(client, rest, io);
+  throw new Error('Usage: kase audit start ... | kase findings list ... | kase gate evaluate|show ... | kase import security-audit ...');
+}
+
+/** Imports cloudflare/security-audit-skill `findings.json`; imported findings are warn-only and never gate-eligible. */
+async function importSecurityAudit(client: KaseClient, args: string[], io: Io): Promise<number> {
+  const parsed = parseArgs({ args, strict: true, allowPositionals: true,
+    options: { audit: { type: 'string' }, json: { type: 'boolean', default: false } } });
+  const file = parsed.positionals[0];
+  if (!parsed.values.audit || !file) throw new Error('Usage: kase import security-audit --audit <id> <findings.json>');
+  let body: unknown;
+  try { body = JSON.parse(await readFile(file, 'utf8')); }
+  catch (error) { throw new Error(`Cannot read ${file} as JSON: ${error instanceof Error ? error.message : String(error)}`); }
+  emit(io, parsed.values.json!, await client.importSecurityAudit(parsed.values.audit, body));
+  return 0;
+}
+
+async function evaluateGate(client: KaseClient, args: string[], io: Io): Promise<number> {
+  const parsed = parseArgs({ args, strict: true, options: { audit: { type: 'string' }, json: { type: 'boolean', default: false } } }).values;
+  if (!parsed.audit) throw new Error('--audit is required');
+  const result = await client.evaluateGate(parsed.audit);
+  if (parsed.json) io.out(JSON.stringify(result));
+  else io.out(formatGate(result.decision));
+  return gateExit[result.decision.outcome];
+}
+
+async function showGate(client: KaseClient, args: string[], io: Io): Promise<number> {
+  const parsed = parseArgs({ args, strict: true, options: { audit: { type: 'string' }, json: { type: 'boolean', default: false } } }).values;
+  if (!parsed.audit) throw new Error('--audit is required');
+  emit(io, parsed.json!, await client.getGate(parsed.audit));
+  return 0;
+}
+
+/** Explainable gate output: every block cites its rule, evidence, and source. */
+function formatGate(d: GateDecision): string {
+  const lines: string[] = [`gate: ${d.outcome.toUpperCase()} (mode=${d.mode})`];
+  if (d.notExecutedCategories.length) lines.push(`required categories not executed: ${d.notExecutedCategories.join(', ')}`);
+  for (const b of d.blocking) {
+    lines.push(`BLOCK ${b.severity} ${b.category} ${b.findingId}`);
+    lines.push(`  rule: ${b.rule}`);
+    lines.push(`  evidence: ${b.evidence.map((e) => `${e.id}(${e.class}${e.replayResult ? `:${e.replayResult}` : ''})`).join(', ')}`);
+    if (b.sourceLocation) lines.push(`  source: ${b.sourceLocation.file} ${b.sourceLocation.enclosingSymbol}${b.sourceLocation.verified ? ' (verified)' : ''}`);
+  }
+  for (const w of d.waived) lines.push(`WAIVED ${w.fingerprint} — expires in ${w.daysRemaining}d (approved by ${w.approvedBy})`);
+  for (const w of d.warnings) lines.push(`warn: ${w.reason}`);
+  return lines.join('\n');
 }
 
 async function startAudit(client: KaseClient, args: string[], io: Io): Promise<number> {
@@ -28,8 +79,8 @@ async function startAudit(client: KaseClient, args: string[], io: Io): Promise<n
   }}).values;
   if (!parsed.project || !parsed.target) throw new Error('--project and --target are required');
   if (!['smoke', 'security', 'full'].includes(parsed.mode!)) throw new Error('--mode must be smoke, security, or full');
-  // Valid categories: sast, http, blackbox, whitebox (M4)
-  const validCategories = ['sast', 'http', 'blackbox', 'whitebox'];
+  // Valid categories: sast, http, blackbox, whitebox (M4); security adds the security-audit methodology to the whitebox agent
+  const validCategories = ['sast', 'http', 'blackbox', 'whitebox', 'security'];
   if (parsed.categories) {
     const cats = parsed.categories.split(',').filter(Boolean);
     const invalid = cats.filter(c => !validCategories.includes(c));

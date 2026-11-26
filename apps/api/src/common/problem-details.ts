@@ -49,6 +49,7 @@ export const ERROR_CODES = {
     title: 'Idempotency-Key header is required',
   },
   RATE_LIMITED: { status: HttpStatus.TOO_MANY_REQUESTS, title: 'Rate limit exceeded' },
+  PAYLOAD_TOO_LARGE: { status: HttpStatus.PAYLOAD_TOO_LARGE, title: 'Request body too large' },
   INTERNAL: { status: HttpStatus.INTERNAL_SERVER_ERROR, title: 'Internal server error' },
   AI_CONFIGURATION_REQUIRED: { status: HttpStatus.UNPROCESSABLE_ENTITY, title: 'AI configuration required' },
   METHODOLOGY_CORRUPT: { status: HttpStatus.INTERNAL_SERVER_ERROR, title: 'Methodology corpus is corrupted' },

@@ -19,7 +19,9 @@ export interface ProviderMessage {
 
 export type ProviderContentBlock =
   | { readonly type: 'text'; readonly text: string; readonly cacheable?: boolean }
-  | { readonly type: 'tool_use'; readonly toolCallId: string; readonly name: string; readonly arguments: Record<string, unknown> }
+  | { readonly type: 'tool_use'; readonly toolCallId: string; readonly name: string; readonly arguments: Record<string, unknown>;
+      /** Opaque provider continuation token (Gemini thought signature). Echoed back verbatim; never interpreted by Kase. */
+      readonly providerState?: string }
   | { readonly type: 'tool_result'; readonly toolCallId: string; readonly content: string; readonly isError?: boolean };
 
 export interface ProviderToolSchema {
@@ -67,6 +69,8 @@ export interface ProviderToolCall {
   readonly toolCallId: string;
   readonly name: string;
   readonly arguments: Record<string, unknown>;
+  /** Opaque provider continuation token; must be carried into the assistant history unchanged. */
+  readonly providerState?: string;
 }
 
 export interface ProviderUsage {
@@ -106,7 +110,7 @@ export interface ProviderPermanentError {
 // ---------------------------------------------------------------------------
 
 export interface AIProvider {
-  readonly providerName: 'anthropic' | 'openai';
+  readonly providerName: 'anthropic' | 'openai' | 'gemini';
 
   /**
    * Send a turn to the model and stream back events.

@@ -12,6 +12,20 @@ export interface AuditRecord {
 
 export interface Page<T> { data?: T[]; items?: T[]; nextCursor?: string | null }
 
+export type GateOutcome = 'pass' | 'fail' | 'partial';
+
+export interface GateDecision {
+  outcome: GateOutcome;
+  mode: string;
+  blocking: Array<{ findingId: string; fingerprint: string; severity: string; category: string; rule: string; evidence: Array<{ id: string; class: string; replayResult?: string }>; sourceLocation?: { file: string; enclosingSymbol: string; verified: boolean } | null }>;
+  warnings: Array<{ findingId?: string; reason: string }>;
+  waived: Array<{ fingerprint: string; expiresAt: string; approvedBy: string; daysRemaining: number; findingIds: string[] }>;
+  notExecutedCategories: string[];
+  degraded: boolean;
+}
+
+export interface GateEvaluationResult { evaluation: Record<string, unknown>; decision: GateDecision }
+
 export class ApiError extends Error {
   constructor(readonly status: number, readonly code: string, message: string) {
     super(message);
@@ -53,6 +67,18 @@ export class KaseClient {
 
   getAudit(auditId: string): Promise<AuditRecord> { return this.request(`/audits/${auditId}`); }
   cancelAudit(auditId: string): Promise<AuditRecord> { return this.request(`/audits/${auditId}/cancel`, { method: 'POST' }); }
+
+  evaluateGate(auditId: string): Promise<GateEvaluationResult> {
+    return this.request(`/audits/${auditId}/gate/evaluate`, { method: 'POST' });
+  }
+
+  getGate(auditId: string): Promise<unknown> {
+    return this.request(`/audits/${auditId}/gate`);
+  }
+
+  importSecurityAudit(auditId: string, findings: unknown): Promise<Record<string, unknown>> {
+    return this.request(`/audits/${auditId}/import/security-audit`, { method: 'POST', body: JSON.stringify(findings) });
+  }
 
   listFindings(auditId: string, filters: Record<string, string | undefined>): Promise<unknown> {
     const query = new URLSearchParams();

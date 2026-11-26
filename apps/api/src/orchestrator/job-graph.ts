@@ -129,7 +129,7 @@ export const ADAPTER_TIMEOUTS_MS = {
 
 export function graphTemplate(
   mode: 'smoke' | 'security' | 'full',
-  categories?: readonly ('sast' | 'http' | 'blackbox' | 'whitebox')[],
+  categories?: readonly ('sast' | 'http' | 'blackbox' | 'whitebox' | 'security')[],
 ): JobTemplate[] {
   if (mode === 'smoke') {
     return [{
@@ -139,6 +139,8 @@ export function graphTemplate(
   }
   const selected = [...(categories ?? (mode === 'full' ? ['sast', 'http'] : ['sast']))];
   if (selected.includes('blackbox') && !selected.includes('http')) selected.push('http');
+  // `security` is not a job of its own: it adds the security-audit methodology to the whitebox agent.
+  if (selected.includes('security') && !selected.includes('whitebox')) selected.push('whitebox');
   if (selected.includes('whitebox') && !selected.includes('sast')) selected.push('sast');
   const jobs: JobTemplate[] = [
     {

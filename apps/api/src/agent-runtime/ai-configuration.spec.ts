@@ -20,6 +20,12 @@ describe('M4 AI configuration and scoped API',()=>{
     const {db,service}=setup();expect(await service.snapshot('p')).toMatchObject({provider:'openai',credentialSecretVersion:3,methodologyDigest:'digest',promptVersion:'v1',budgetMaxCalls:120});
     expect(db.secret.findFirst.mock.calls[0][0].where).toEqual({id:'secret',projectId:'p',revokedAt:null,kind:'openai_api_key'});
   });
+  it('accepts gemini-4-carbon against a catalog entry and requires a gemini_api_key secret',async()=>{
+    const {db,service}=setup();
+    await expect(service.validate('p',{...input,provider:'gemini',modelId:'gemini-4-carbon'})).resolves.toMatchObject({config:{provider:'gemini',modelId:'gemini-4-carbon'},credentialSecretVersion:3});
+    expect(db.modelCatalogEntry.findUnique.mock.calls[0][0].where.provider_modelId_catalogRevision).toEqual({provider:'gemini',modelId:'gemini-4-carbon',catalogRevision:1});
+    expect(db.secret.findFirst.mock.calls[0][0].where.kind).toBe('gemini_api_key');
+  });
   it.each([{modelId:'latest'},{credentialMode:'platform'},{budgetTotalTokens:1},{budgetMaxCalls:1},{budgetMaxOutputTokens:0},{provider:'unknown'}])('rejects invalid configuration %p',async changes=>{
     await expect(setup().service.validate('p',{...input,...changes})).rejects.toThrow();
   });

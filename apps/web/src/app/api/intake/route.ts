@@ -18,8 +18,12 @@ export async function POST(request: Request) {
   const company = typeof body?.company === 'string' ? body.company.trim() : '';
   const message = typeof body?.message === 'string' ? body.message.trim() : '';
 
-  if (!kinds.has(kind) || !name || !email || !message || !/^\S+@\S+\.\S+$/.test(email)) {
-    return NextResponse.json({ message: 'Provide a name, valid work email, and message.' }, { status: 422 });
+  if (!kinds.has(kind) || !name || !email || !/^\S+@\S+\.\S+$/.test(email)) {
+    return NextResponse.json({ message: 'Provide a name and a valid work email.' }, { status: 422 });
+  }
+  // The waitlist only needs a name and email; requests and security reports need context.
+  if (!message && kind !== 'waitlist') {
+    return NextResponse.json({ message: 'Add some context so the team can follow up.' }, { status: 422 });
   }
   if ([name, email, company, message].some((value) => value.length > 4000)) {
     return NextResponse.json({ message: 'One or more fields are too long.' }, { status: 422 });
@@ -28,7 +32,7 @@ export async function POST(request: Request) {
   const response = await fetch(intakeUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ kind, name, email, company: company || null, message, receivedAt: new Date().toISOString() }),
+    body: JSON.stringify({ kind, name, email, company: company || null, message: message || null, receivedAt: new Date().toISOString() }),
     signal: AbortSignal.timeout(5000),
   }).catch(() => null);
 

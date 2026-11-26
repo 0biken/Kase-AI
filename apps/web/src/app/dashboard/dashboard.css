@@ -80,15 +80,10 @@
   box-shadow: inset -1px 0 0 rgba(255, 255, 255, .025);
 }
 
-.dash-brand-mark {
-  /* The one place in the chrome where the accent reads as a light source
-     rather than a colour. Spread stays tight so it doesn't bleed into the
-     wordmark sitting 9px away. */
-  border-color: rgba(98, 213, 187, .55);
-  background: radial-gradient(120% 120% at 50% 0%, rgba(98, 213, 187, .16), rgba(98, 213, 187, .04));
-  box-shadow:
-    0 0 14px -4px rgba(98, 213, 187, .5),
-    inset 0 1px 0 rgba(255, 255, 255, .1);
+.dash-brand .kase-mark {
+  /* The mark is the logo now, not a glowing tile: no halo, just the
+     letterform in text colour. */
+  color: var(--text);
 }
 
 
@@ -373,4 +368,122 @@
       backdrop-filter: blur(9px) saturate(125%);
     }
   }
+}
+
+
+/* ------------------------------------------------------- workspace screens
+
+   Audits, findings and the release gate. Dense and still: these are read many
+   times a day, so there is no entry motion here, only hover and focus
+   feedback. Colour is reserved for severity and gate outcome. */
+
+/* minmax(0, 1fr): without it a wide table sets the column's minimum and the
+   whole page scrolls sideways instead of just the table. */
+.ws-stack { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; max-width: 1180px; }
+.ws-mono { font-family: var(--font-mono); font-size: 12px; }
+.ws-muted { color: var(--quiet); }
+.ws-nowrap { white-space: nowrap; }
+.ws-inline { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.ws-visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+.ws-sample {
+  margin-left: 10px; padding: 2px 8px; vertical-align: middle;
+  border: 1px dashed var(--sev-medium); border-radius: 6px;
+  color: var(--sev-medium); font: 500 11px var(--font-mono); letter-spacing: .03em;
+}
+
+/* ---- chips: one shape for severity, status and small tags */
+.ws-chip {
+  --tone: var(--muted);
+  display: inline-flex; align-items: center; padding: 2px 8px;
+  border: 1px solid color-mix(in srgb, var(--tone) 45%, transparent);
+  border-radius: 999px; background: color-mix(in srgb, var(--tone) 10%, transparent);
+  color: var(--tone); font: 600 10.5px var(--font-mono); letter-spacing: .04em; text-transform: uppercase; white-space: nowrap;
+}
+.ws-chip-critical { --tone: var(--sev-critical); }
+.ws-chip-high { --tone: var(--sev-high); }
+.ws-chip-medium { --tone: var(--sev-medium); }
+.ws-chip-low { --tone: var(--sev-low); }
+.ws-chip-pass { --tone: var(--sev-pass); }
+
+/* ---- audit summary strip */
+.ws-facts { margin: 0; display: flex; flex-wrap: wrap; gap: 12px 36px; }
+.ws-facts > div { display: grid; gap: 4px; }
+.ws-facts dt { color: var(--quiet); font-size: 11.5px; }
+.ws-facts dd { margin: 0; color: var(--text); font-size: 13px; }
+.ws-facts-inline { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+
+/* ---- tabs */
+.ws-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); }
+.ws-tabs a {
+  padding: 9px 12px; margin-bottom: -1px; border-bottom: 2px solid transparent;
+  color: var(--muted); font-size: 13.5px; transition: color 160ms var(--ease-hover);
+}
+.ws-tabs a[aria-current='page'] { color: var(--text); border-bottom-color: var(--accent); }
+@media (hover: hover) and (pointer: fine) { .ws-tabs a:hover { color: var(--text); } }
+
+/* ---- filters */
+.ws-filters { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; }
+.ws-filter { display: grid; gap: 5px; }
+.ws-filter label { color: var(--quiet); font-size: 11.5px; }
+.ws-filter select {
+  min-width: 150px; height: 36px; padding: 0 30px 0 11px; appearance: none;
+  border: 1px solid var(--line-strong); border-radius: 9px; color: var(--text); font-size: 13px;
+  background: #0b0f12 url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' fill='none' stroke='%239bacb0' stroke-width='1.5'%3E%3Cpath d='m1 1 4 4 4-4'/%3E%3C/svg%3E") no-repeat right 11px center;
+}
+.ws-filter select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.dash .ws-filter-apply { min-height: 36px; padding: 0 14px; font-size: 13px; }
+.ws-filter-clear { height: 36px; display: inline-flex; align-items: center; color: var(--muted); font-size: 13px; text-decoration: underline; text-underline-offset: 3px; }
+
+/* ---- tables */
+/* position: relative keeps visually-hidden header text inside the scroll
+   area; otherwise it widens the whole page on narrow screens. */
+.ws-table-wrap { position: relative; overflow-x: auto; border-radius: inherit; }
+.ws-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ws-table th {
+  padding: 11px 16px; text-align: left; white-space: nowrap;
+  color: var(--quiet); font-size: 11.5px; font-weight: 500; border-bottom: 1px solid var(--line);
+}
+.ws-table td { padding: 13px 16px; vertical-align: top; color: var(--muted); border-bottom: 1px solid rgba(255, 255, 255, .045); }
+.ws-table tbody tr:last-child td { border-bottom: 0; }
+@media (hover: hover) and (pointer: fine) { .ws-table tbody tr:hover td { background: rgba(255, 255, 255, .018); } }
+.ws-table .ws-num { text-align: right; }
+.ws-row-link { color: var(--text); }
+.ws-row-link:hover { color: var(--accent); }
+.ws-actions { text-align: right; }
+.ws-actions a { color: var(--accent); font-size: 12.5px; }
+.ws-finding, .ws-source { display: grid; gap: 5px; min-width: 220px; }
+td.ws-finding, td.ws-source { display: table-cell; }
+.ws-finding-title { display: block; color: var(--text); font-size: 13.5px; line-height: 1.4; }
+.ws-finding-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 5px; color: var(--quiet); font-size: 12px; }
+.ws-source > .ws-mono { color: var(--text); overflow-wrap: anywhere; }
+
+/* ---- gate outcome */
+.ws-outcome { --tone: var(--muted); border-color: color-mix(in srgb, var(--tone) 35%, var(--line)); }
+.ws-outcome-pass { --tone: var(--sev-pass); }
+.ws-outcome-fail { --tone: var(--sev-critical); }
+.ws-outcome-partial { --tone: var(--sev-medium); }
+.ws-outcome-label { margin: 0 0 6px; color: var(--quiet); font-size: 12px; }
+.ws-outcome-value { margin: 0 0 8px; color: var(--tone); font-size: 20px; font-weight: 600; letter-spacing: var(--track-tight); }
+.ws-count { margin-left: 6px; color: var(--quiet); font: 500 12px var(--font-mono); }
+.ws-id-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.ws-id-list li { display: flex; align-items: flex-start; gap: 10px; padding: 10px 0; border-top: 1px solid var(--line); }
+.ws-id-list li:first-child { border-top: 0; padding-top: 0; }
+.ws-id-text { display: grid; gap: 3px; min-width: 0; color: var(--text); font-size: 13px; line-height: 1.4; }
+.ws-pill-list { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---- empty / problem states */
+.ws-state-body { display: grid; gap: 10px; max-width: 62ch; color: var(--muted); font-size: 13.5px; line-height: 1.6; }
+.ws-state-body p { margin: 0; }
+.ws-state-problem { border-color: color-mix(in srgb, var(--sev-critical) 35%, var(--line)); }
+.ws-command {
+  margin: 0; padding: 11px 13px; overflow-x: auto;
+  border: 1px solid var(--line); border-radius: 9px; background: #0b0f12;
+  color: var(--text); font: 400 12.5px/1.5 var(--font-mono);
+}
+
+@media (max-width: 680px) {
+  .ws-filter, .ws-filter select { width: 100%; }
+  .ws-filters { align-items: stretch; }
+  .ws-table th, .ws-table td { padding-left: 12px; padding-right: 12px; }
 }

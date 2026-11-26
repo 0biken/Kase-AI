@@ -52,11 +52,24 @@ function injectedClass(cls: ClassDeclaration, property: string): ClassDeclaratio
   if (!parameter) return undefined;
   const type = parameter.getTypeNode();
   if (!type) return undefined;
-  // Custom provider tokens/factories cannot be established by static type analysis.
-  if (parameter.getDecorators().length) return undefined;
   const symbol = type.getType().getSymbol();
   const declarations = symbol?.getDeclarations().filter(Node.isClassDeclaration) ?? [];
-  return declarations.length === 1 ? declarations[0] : undefined;
+  if (declarations.length !== 1) return undefined;
+  const declaredClass = declarations[0];
+  for (const decorator of parameter.getDecorators()) {
+    const binding = parameter.getSourceFile().getImportDeclarations()
+      .filter(statement => statement.getModuleSpecifierValue() === '@nestjs/common')
+      .flatMap(statement => statement.getNamedImports())
+      .find(item => (item.getAliasNode()?.getText() ?? item.getName()) === decorator.getName());
+    const args = decorator.getArguments();
+    // Only an explicit Nest class token identical to the declared type is
+    // resolvable here. Strings, factory tokens and custom decorators remain unknown.
+    if (binding?.getName() !== 'Inject' || args.length !== 1 || !Node.isIdentifier(args[0])) return undefined;
+    const tokenSymbol = args[0].getSymbol();
+    const tokenDeclarations = (tokenSymbol?.getAliasedSymbol() ?? tokenSymbol)?.getDeclarations() ?? [];
+    if (tokenDeclarations.length !== 1 || tokenDeclarations[0] !== declaredClass) return undefined;
+  }
+  return declaredClass;
 }
 
 export function buildNestGraph(project: Project, root: string, route: ResolvedRoute,

@@ -55,12 +55,49 @@ export function sseEvents(plan, sequence) {
   ];
 }
 
+/**
+ * One-shot hold control for the G5 crash and cancellation scenarios. When armed, the next
+ * provider request receives its stream headers and first event, then stalls until it is
+ * released or the client disconnects (a killed worker or an aborted turn). Control routes
+ * answer only loopback callers, so they are reachable via `docker compose exec` but not
+ * through the agent egress proxy.
+ */
+export function createHoldControl() {
+  const state = { armed: false, held: 0, aborted: 0, released: 0 };
+  let release;
+  return {
+    state,
+    arm() { state.armed = true; },
+    release() { if (release) { release(); release = undefined; state.released += 1; } },
+    /** Returns a promise (resolving to 'released') when this request should be held, else undefined. */
+    take() {
+      if (!state.armed) return undefined;
+      state.armed = false;
+      state.held += 1;
+      return new Promise(resolvePromise => { release = () => resolvePromise('released'); });
+    },
+    abort() { release = undefined; state.aborted += 1; },
+  };
+}
+
+const isLoopback = address => address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
+
 export function createFixtureServer() {
   let sequence = 0;
+  const hold = createHoldControl();
   return createServer(async (request, response) => {
     if (request.method === 'GET' && request.url === '/healthz') {
       response.writeHead(200, { 'content-type': 'application/json' });
       response.end('{"ok":true}');
+      return;
+    }
+    if (request.url?.startsWith('/control/')) {
+      if (!isLoopback(request.socket.remoteAddress)) { response.writeHead(403).end(); return; }
+      if (request.method === 'POST' && request.url === '/control/hold') hold.arm();
+      else if (request.method === 'POST' && request.url === '/control/release') hold.release();
+      else if (!(request.method === 'GET' && request.url === '/control/state')) { response.writeHead(404).end(); return; }
+      response.writeHead(200, { 'content-type': 'application/json' });
+      response.end(JSON.stringify(hold.state));
       return;
     }
     if (request.method !== 'POST' || request.url !== '/v1/responses') {
@@ -78,8 +115,15 @@ export function createFixtureServer() {
       for await (const chunk of request) chunks.push(chunk);
       const body = JSON.parse(Buffer.concat(chunks).toString('utf8'));
       const plan = responsePlan(body);
+      const events = sseEvents(plan, ++sequence);
       response.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
-      for (const event of sseEvents(plan, ++sequence)) response.write(`data: ${JSON.stringify(event)}\n\n`);
+      const held = hold.take();
+      if (held) {
+        response.write(`data: ${JSON.stringify(events.shift())}\n\n`);
+        const outcome = await Promise.race([held, new Promise(resolvePromise => response.on('close', () => resolvePromise('aborted')))]);
+        if (outcome === 'aborted' || response.destroyed) { hold.abort(); return; }
+      }
+      for (const event of events) response.write(`data: ${JSON.stringify(event)}\n\n`);
       response.end('data: [DONE]\n\n');
     } catch {
       response.writeHead(422, { 'content-type': 'application/json' });

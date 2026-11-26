@@ -111,7 +111,7 @@ required_categories:
   - security
   - authz
   - static_security
-  - dependencies
+  # - dependencies   # joins with the M7 deps adapter; no job can execute it yet
 
 fail_closed:
   audit_status: [failed, partial]

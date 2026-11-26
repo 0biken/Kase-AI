@@ -5,7 +5,7 @@ const RANK = { runtime_dump: 0, openapi: 1, static_parse: 2 };
 /** Supports plain segments and named parameters; regex routes are rejected. */
 export function normalizeRoutePath(path: string): string {
   if (!path.startsWith('/') || path.includes('?') || path.includes('#') || path.includes('\\')) throw new Error('Unsupported route path');
-  return '/' + path.split('/').filter(Boolean).map(segment => {
+  return path.split('/').map(segment => {
     if (/^:[A-Za-z_][\w]*$/u.test(segment) || /^\{[A-Za-z_][\w]*\}$/u.test(segment)) return '{param}';
     if (/[{}:*()[\]]/u.test(segment) || segment === '.' || segment === '..') throw new Error('Unsupported route segment');
     return segment;
@@ -14,11 +14,11 @@ export function normalizeRoutePath(path: string): string {
 
 export function resolveRoutes(method: string, pathname: string, routes: ResolvedRoute[]): ResolvedRoute[] {
   if (!METHODS.has(method.toUpperCase())) return [];
-  const actual = pathname.split('/').filter(Boolean);
+  const actual = pathname.split('/');
   const candidates = routes.filter(route => route.method.toUpperCase() === method.toUpperCase()).flatMap(route => {
     try {
-      const expected = normalizeRoutePath(route.pathTemplate).split('/').filter(Boolean);
-      if (expected.length !== actual.length || expected.some((part, i) => part !== '{param}' && part !== actual[i])) return [];
+      const expected = normalizeRoutePath(route.pathTemplate).split('/');
+      if (expected.length !== actual.length || expected.some((part, i) => part === '{param}' ? actual[i] === '' : part !== actual[i])) return [];
       return [{ route, specificity: expected.filter(part => part !== '{param}').length }];
     } catch { return []; }
   });

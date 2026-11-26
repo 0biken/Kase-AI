@@ -11,6 +11,7 @@ import {
 } from './dto/project.dto';
 import { RepositoryInputDto, UpdateRepositoryDto } from './dto/repository.dto';
 import { TargetInputDto, UpdateTargetDto } from './dto/target.dto';
+import { DEFAULT_GATE_POLICY } from '../assurance/policy/policy-schema';
 
 /**
  * 17-security §3: "Attestations are recorded with identity and timestamp and go
@@ -27,12 +28,6 @@ export interface Actor {
   id?: string;
   organizationId?: string;
 }
-
-const DEFAULT_GATE_POLICY_RULES = {
-  // ADR-002: only replayable evidence may block. AI-only findings warn.
-  blockOn: { minSeverity: 'high', requiresReplayableEvidence: true },
-  warnOn: { aiOnly: true },
-};
 
 @Injectable()
 export class ProjectsService {
@@ -95,9 +90,11 @@ export class ProjectsService {
         data: {
           id: gatePolicyId,
           projectId,
-          version: 1,
-          name: 'default',
-          rules: DEFAULT_GATE_POLICY_RULES,
+          version: DEFAULT_GATE_POLICY.version,
+          name: DEFAULT_GATE_POLICY.name,
+          // The full validated policy DSL (12-policy-gate §4), shipped in
+          // observe mode. See assurance/policy/policy-schema.ts.
+          rules: DEFAULT_GATE_POLICY as object,
         },
       });
 

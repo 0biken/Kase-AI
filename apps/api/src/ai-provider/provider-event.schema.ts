@@ -10,6 +10,7 @@ export const ToolCallSchema = z.object({
   toolCallId: z.string().min(1),
   name: z.string().min(1),
   arguments: z.record(z.unknown()),
+  providerState: z.string().max(65536).optional(),
 });
 
 export const UsageSchema = z.object({

@@ -54,7 +54,7 @@ export class OrchestratorService {
     const requestedCategories = dto.mode === 'smoke'
       ? [dto.category ?? dto.categories?.[0] ?? 'fixture_health']
       : [...new Set(dto.categories?.length ? dto.categories : dto.mode === 'full' ? ['sast', 'http'] : ['sast'])];
-    const allowedCategories = dto.mode === 'smoke' ? ['fixture_health'] : dto.mode === 'security' ? ['sast'] : ['sast', 'http', 'blackbox', 'whitebox'];
+    const allowedCategories = dto.mode === 'smoke' ? ['fixture_health'] : dto.mode === 'security' ? ['sast'] : ['sast', 'http', 'blackbox', 'whitebox', 'security'];
     const unsupported = requestedCategories.filter((category) => !allowedCategories.includes(category));
     if (unsupported.length > 0) {
       throw new ProblemException('VALIDATION_FAILED', `Unsupported ${dto.mode} categories: ${unsupported.join(', ')}`);
@@ -110,7 +110,7 @@ export class OrchestratorService {
       }
     }
 
-    const aiRequested = requestedCategories.includes('blackbox') || requestedCategories.includes('whitebox');
+    const aiRequested = requestedCategories.includes('blackbox') || requestedCategories.includes('whitebox') || requestedCategories.includes('security');
     let aiConfig: any = null;
     if (aiRequested) {
       if (!this.aiConfigurations) throw new ProblemException('INTERNAL', 'AI configuration service unavailable');
@@ -120,7 +120,7 @@ export class OrchestratorService {
     const auditId = newId('audit');
     const templates = graphTemplate(
       dto.mode,
-      dto.mode === 'smoke' ? undefined : requestedCategories as Array<'sast' | 'http' | 'blackbox' | 'whitebox'>,
+      dto.mode === 'smoke' ? undefined : requestedCategories as Array<'sast' | 'http' | 'blackbox' | 'whitebox' | 'security'>,
     );
     const jobIds = new Map(templates.map((template) => [template.kind, newId('auditJob')]));
     const audit = await this.prisma.$transaction(async (tx) => {

@@ -8,10 +8,30 @@
     "blackbox/finding-format.md": "230ab23c533680f7633ae463c968040a26f569d87f32994498fc44a782085a71",
     "blackbox/report-structure.md": "b8e75a4854828a0235d3fa9add8f0bbb680bfa05128c9b404eb4b0e7450d2e3a",
     "blackbox/test-categories.md": "21a2b0609f29009a3bda37271dde619d735212a1f7fd48668e54b7be59dcd4b9",
+    "security/00-kase-security-instructions.md": "9223b14103a2cd4cebd405219514a627d5bd396600cbde90cf95be7127544d9a",
+    "security/AI-AND-LLM.md": "7335a95c43554eadefcf03ece639291bb0e038c398a179299e3887ffe06bd2ef",
+    "security/ATTACK-CLASSES.md": "3ee4f00c6e8c9dcf6dd02dd5ac2a4ceb322e2085f3e9fbe79cf0c6330bc7ef83",
+    "security/CLIENT-SIDE.md": "613f6b98f86083e045525c5b60154ffdab122bac35f1e05eb17488e6e453370c",
+    "security/CLOUD-AND-DEPLOYMENT.md": "3c80f3088be22345e07b057c056d6ed99fe2b0304f794398964f7ccd5a496ca3",
+    "security/DATA-ISOLATION-AND-LIFECYCLE.md": "307dcb3e24d292715c4a041190e7bb135646a37eb6187619ae01d000a634a4ad",
+    "security/DESKTOP-MOBILE-AND-LOCAL-IPC.md": "58eae8ee0ca6a46611c501ec5a3ab47fdff88dd7db0d8d74789bbf8bb19d8cb2",
+    "security/HUNTING.md": "71c121decea1322c47c718f6e110f1a892980bb4266bd7ac55ef043a213ade09",
+    "security/MEMORY-SAFETY-AND-BINARY.md": "7c8b0dccfb35315cca2455509674d49632b2fe37e1f3aac16c1a496a7e9924a7",
+    "security/PROTOCOLS-RPC-AND-MESSAGING.md": "8b73816fa5b3697c9c40977f0c836b40f01d6e81929ff2720fe83ce089e9a619",
+    "security/RECONNAISSANCE.md": "02ca887aca84de8ae137f1891bd2f0a54f28d3fa6da92a27f54734382b3381a2",
+    "security/RESOURCE-EXHAUSTION-AND-AVAILABILITY.md": "4326fab5c92a0b4c420a70196254040105cd794026562130b59bf1a6db3e4baa",
+    "security/SUPPLY-CHAIN-AND-RELEASE.md": "f372e919940e335468ba1ae09f99026c3986a345f7fe26f8068f132e199f52a5",
+    "security/VALIDATION-AND-REPORTING.md": "b892470cb89bb31f33403e050d4bdfbe2cdaef940ade1496fa65e32b2e129449",
+    "security/WEB-PROTOCOL-AND-AUTH.md": "4f3066dffa23c5635859187be9b96c32f2aff29a688186b91ff0c63e47d62b5c",
     "whitebox/finding-format-whitebox.md": "c0426ff8d6a55d558111904852592242a540ba239ef44a849c2f3c5e579df7d2",
     "whitebox/report-structure-whitebox.md": "bb5ff46844e1f94fffaa732fd0e7d6f672e68bae1dac39ffcde4dd3d197bdd0f",
     "whitebox/whitebox-categories.md": "b70adb07ba8451539f609535ad0e7eb3a0087d39148462e5fece25df3a2efe60"
   },
   "upstreamSkillVersion": "1.0.0",
-  "kasePromptVersion": "m4-1.0.0"
+  "kasePromptVersion": "m7-1.0.0",
+  "upstreamSecurityAudit": {
+    "repo": "https://github.com/cloudflare/security-audit-skill",
+    "commit": "c1c8a8c1471069fb0e188eeaff69b8e8db6564a8",
+    "license": "MIT"
+  }
 }
