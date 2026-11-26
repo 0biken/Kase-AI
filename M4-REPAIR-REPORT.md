@@ -51,3 +51,11 @@ G6 is deferred as requested. Its unresolved configuration is:
 Once the independent work is complete and Router configuration is available, resume the G6 proof: both real tool exchanges, one bounded unaided vulnerable-fixture audit, the same-model ownership-fixed negative control, independent HTTP replay, persisted evidence/usage/terminal state and final regressions. No direct-provider substitution and no repeated discovery attempts to obtain a passing result.
 
 Ledger: six local/structural checks met, six full acceptance gates unmet, no abandonment. M4 must not be marked complete from this checkpoint.
+
+## Continuation — 13 November 2026
+
+No live evidence was produced; Docker is still unavailable and no provider keys are configured. M4 remains 1/15 certified.
+
+- **G5 driver** (`scripts/m4-compose-driver.mjs`) now runs three scenarios against the deterministic fixture: the existing happy path, agent-worker crash recovery during a held provider turn, and API cancellation during a held turn. The fixture (`scripts/m4-provider-fixture.mjs`) gained a loopback-only one-shot hold/release control for this. It prints the G5 marker `M4 agent proof passed:` only when all three pass. Deterministic tests: 7 passed, zero skipped (`node --test scripts/m4-compose-driver.test.mjs`).
+- **G6** rescoped to Gemini plus one of Anthropic/OpenAI, with the provider's own API host as the router. `scripts/m4-real-provider-proof.ps1` is no longer a stub: part A live tool exchange (`test:live` runner, pending), part B `--real-provider` driver mode (unaided audit created through the API, then the same model against the ownership-fixed fixture mounted read-only), part C regressions. Keys pass through by name and are never written to generated compose files. The script fails closed on missing configuration or Docker.
+- Remaining before M4 can close: run G2/G5/G6 on a machine with Docker and provider keys; the independent review against all original findings.

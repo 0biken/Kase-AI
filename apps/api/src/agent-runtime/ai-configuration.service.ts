@@ -8,7 +8,7 @@ import type { Actor } from '../projects/projects.service';
 
 const positive = z.number().int().positive();
 export const AiConfigurationSchema = z.object({
-  provider: z.enum(['anthropic', 'openai']), modelId: z.string().min(1).max(200),
+  provider: z.enum(['anthropic', 'openai', 'gemini']), modelId: z.string().min(1).max(200),
   catalogRevision: positive, credentialMode: z.enum(['project_secret', 'platform']),
   credentialSecretId: z.string().min(1).nullable().optional(),
   budgetTotalTokens: positive.max(2000000).default(2000000),

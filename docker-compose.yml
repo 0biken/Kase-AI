@@ -274,6 +274,9 @@ services:
       KASE_AGENT_ROUTER_HOSTS: ${KASE_AGENT_ROUTER_HOSTS:-}
       KASE_OPENAI_BASE_URL: ${KASE_OPENAI_BASE_URL:-}
       KASE_ANTHROPIC_BASE_URL: ${KASE_ANTHROPIC_BASE_URL:-}
+      KASE_GEMINI_BASE_URL: ${KASE_GEMINI_BASE_URL:-}
+      # Built-in fetch (used by @google/genai) only honours HTTP(S)_PROXY when this is set.
+      NODE_USE_ENV_PROXY: "1"
       KASE_WORKER_IMAGE_DIGEST: kase/worker-agent-main:dev
       HOME: /tmp
       KASE_JOB_LEASE_MS: ${KASE_JOB_LEASE_MS:-60000}

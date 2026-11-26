@@ -1,14 +1,46 @@
-# G6 remains deferred until both Router protocols and pinned models are known.
-# Never certify this gate from source checks or credential presence alone.
-param()
+# G6: real-provider proof. Providers: Gemini plus KASE_M4_SECOND_PROVIDER (anthropic|openai).
+# The provider's own API host is the Agent Router, reached only through the agent egress proxy.
+#   Part A  live two-turn tool exchange per provider (no Docker)        -> pnpm --filter @kase/api test:live
+#   Part B  unaided seeded-IDOR audit + ownership-fixed negative control -> m4-compose-driver.mjs --real-provider
+#   Part C  complete local M1-M4 regressions
+# Exactly one bounded attempt per step; never rerun discovery to obtain a pass. Never certify from configuration presence.
+# Credentials are read from the environment by name and never written to proof artifacts.
+[CmdletBinding()]
+param([switch]$KeepStack, [switch]$SkipBuild)
 $ErrorActionPreference = 'Stop'
-$missing = @()
-foreach ($name in @('KASE_OPENAI_BASE_URL', 'KASE_ANTHROPIC_BASE_URL', 'KASE_AGENT_ROUTER_HOSTS', 'KASE_M4_OPENAI_MODEL_ID', 'KASE_M4_ANTHROPIC_MODEL_ID')) {
-    if (-not [Environment]::GetEnvironmentVariable($name)) { $missing += $name }
+$root = Split-Path -Parent $PSScriptRoot
+
+function Fail([string]$message) { Write-Error "G6 INCOMPLETE: $message"; exit 1 }
+
+$second = $env:KASE_M4_SECOND_PROVIDER
+if ($second -notin @('anthropic', 'openai')) { Fail 'set KASE_M4_SECOND_PROVIDER to anthropic or openai' }
+$providers = @('gemini', $second)
+$required = @{
+    gemini    = @('GEMINI_API_KEY', 'KASE_M4_GEMINI_MODEL_ID', 'KASE_GEMINI_BASE_URL')
+    anthropic = @('ANTHROPIC_API_KEY', 'KASE_M4_ANTHROPIC_MODEL_ID', 'KASE_ANTHROPIC_BASE_URL')
+    openai    = @('OPENAI_API_KEY', 'KASE_M4_OPENAI_MODEL_ID', 'KASE_OPENAI_BASE_URL')
 }
-if ($missing.Count -gt 0) {
-    Write-Error ("G6 INCOMPLETE: configure " + ($missing -join ', ') + '. Credentials must be resolved securely for both providers; values must never be included in proof artifacts.')
-    exit 1
+$missing = @('KASE_AGENT_ROUTER_HOSTS') + ($providers | ForEach-Object { $required[$_] }) | Where-Object { -not [Environment]::GetEnvironmentVariable($_) }
+if ($missing) { Fail ("configure " + (($missing | Select-Object -Unique) -join ', ')) }
+
+# Part A: live provider tool exchanges (runs without Docker).
+& pnpm --dir $root --filter '@kase/api' test:live
+if ($LASTEXITCODE -ne 0) { Fail 'part A live tool exchange did not pass (see .m4-proof/live/G6-exchange.json)' }
+
+# Part B needs the Docker Linux engine.
+& docker version --format '{{.Server.Version}}' *> $null
+if ($LASTEXITCODE -ne 0) { Fail 'Docker unavailable; part A passed, part B (unaided audit + fixed control) and part C not run' }
+foreach ($provider in $providers) {
+    $driverArguments = @((Join-Path $PSScriptRoot 'm4-compose-driver.mjs'), '--real-provider', $provider)
+    if ($KeepStack) { $driverArguments += '--keep-stack' }
+    if ($SkipBuild) { $driverArguments += '--skip-build' }
+    & node @driverArguments
+    if ($LASTEXITCODE -ne 0) { Fail "part B audit proof failed for $provider" }
 }
-Write-Error 'G6 INCOMPLETE: live Router proof is deferred. Required evidence: both pinned-provider tool exchanges; unaided seeded-IDOR audit and ownership-fixed negative control with the same proof model; independent HTTP replays; persisted evidence/usage/terminal states; complete M1-M4 regressions. Configuration presence is not proof.'
-exit 1
+
+# Part C: complete local regressions.
+& node (Join-Path $PSScriptRoot 'verify-m4-local-regressions.mjs')
+if ($LASTEXITCODE -ne 0) { Fail 'part C M1-M4 regressions failed' }
+
+Write-Output ("M4 real-provider proof passed: providers=" + ($providers -join ','))
+exit 0

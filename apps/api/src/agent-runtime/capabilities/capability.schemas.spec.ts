@@ -5,7 +5,7 @@ import { computeFingerprint, computeSeverity } from './finding-authority';
 describe('M4 capability security and persistence', () => {
   function setup() {
     const evidence = { id: 'ev', auditId: 'audit', type: 'http_exchange', replayable: true, truncated: false, metadata: { url: 'https://target.test/invoices/1' } };
-    const db: any = { audit: { findFirst: jest.fn().mockResolvedValue({ id: 'audit', status: 'running', cancellationRequestedAt: null, target: { baseUrl: 'https://target.test' } }), update: jest.fn() }, evidence: { findMany: jest.fn().mockResolvedValue([evidence]) }, findingIdentity: { upsert: jest.fn().mockResolvedValue({ id: 'identity' }) }, finding: { upsert: jest.fn() }, agentCoverageResult: { upsert: jest.fn() }, agentRun: { update: jest.fn() }, passingCheck: { upsert: jest.fn() }, endpointInventory: { findFirst: jest.fn().mockResolvedValue(null) }, testIdentity: { findMany: jest.fn().mockResolvedValue([]) } };
+    const db: any = { audit: { findFirst: jest.fn().mockResolvedValue({ id: 'audit', status: 'running', cancellationRequestedAt: null, target: { baseUrl: 'https://target.test' } }), update: jest.fn() }, evidence: { findMany: jest.fn().mockResolvedValue([evidence]) }, findingIdentity: { upsert: jest.fn().mockResolvedValue({ id: 'identity' }), update: jest.fn() }, finding: { findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn() }, agentCoverageResult: { upsert: jest.fn() }, agentRun: { update: jest.fn() }, passingCheck: { upsert: jest.fn() }, endpointInventory: { findFirst: jest.fn().mockResolvedValue(null) }, testIdentity: { findMany: jest.fn().mockResolvedValue([]) } };
     db.$transaction = (fn: any) => fn(db);
     const trail = { record: jest.fn() }; const events = { append: jest.fn() };
     const executor = new CapabilityExecutor(db, trail as any, events as any, {} as any, {} as any);
@@ -17,6 +17,15 @@ describe('M4 capability security and persistence', () => {
     const { db, call } = setup();
     expect((await call('create_finding', { ...finding, type: 'white_box' })).success).toBe(true);
     expect(db.finding.upsert.mock.calls[0][0].create).toMatchObject({ origin: 'blackbox', severity: 'high', cwe: 'CWE-639', gateEligible: false, fix: 'Check ownership' });
+  });
+  it('increments identity occurrences once for a new audit occurrence, never on replay', async () => {
+    const { db, call } = setup();
+    expect((await call('create_finding', { ...finding, type: 'white_box' })).success).toBe(true);
+    expect(db.findingIdentity.upsert.mock.calls[0][0].create.occurrences).toBe(0);
+    expect(db.findingIdentity.update).toHaveBeenCalledWith(expect.objectContaining({ data: { occurrences: { increment: 1 } } }));
+    db.finding.findUnique.mockResolvedValue({ id: 'existing' }); db.findingIdentity.update.mockClear();
+    expect((await call('create_finding', { ...finding, type: 'white_box' })).success).toBe(true);
+    expect(db.findingIdentity.update).not.toHaveBeenCalled();
   });
   it('rejects missing, expired or foreign evidence returned by scoped lookup', async () => {
     const { db, call } = setup(); db.evidence.findMany.mockResolvedValue([]);

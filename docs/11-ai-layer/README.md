@@ -10,16 +10,38 @@ The domain layer must not depend on one model provider.
 
 ```ts
 interface AIProvider {
-  readonly providerName: 'anthropic' | 'openai'
+  readonly providerName: 'anthropic' | 'openai' | 'gemini'
   runTurn(req: ProviderRequest, signal?: AbortSignal): AsyncIterable<ProviderEvent>
 }
 ```
 
-Implementations: Anthropic Messages and OpenAI Responses. ADR-017 requires explicit provider and model selection; there is no default or fallback provider. Every request carries a budget handle and every completed response reports actual usage. The worker owns the durable loop; adapters only translate one provider turn.
+Implementations: Anthropic Messages, OpenAI Responses, and the Gemini API (`@google/genai`, `generateContentStream`). ADR-017 requires explicit provider and model selection; there is no default or fallback provider. Every request carries a budget handle and every completed response reports actual usage. The worker owns the durable loop; adapters only translate one provider turn.
 
 Each project selects an exact model and catalog revision with streaming and tool-use support. Credential mode is explicit: `project_secret` references a live project-owned provider secret, while `platform` requires an explicit deployment policy. Dispatch freezes the credential reference and version, budgets, model, prompt version, and verified methodology digest. Revocation is rechecked when resolving each provider client.
 
 Provider clients live in the agent-worker dependency graph. Deterministic audit defaults and API startup do not require provider credentials. Agent Router base URLs and allowed hosts must be configured explicitly; the worker uses its egress proxy and never substitutes direct provider APIs.
+
+### Gemini specifics
+
+- **Credentials:** secret kind `gemini_api_key`; platform key `GEMINI_API_KEY`; base URL `KASE_GEMINI_BASE_URL` (falls back to `AGENT_ROUTER_URL`), subject to the same `KASE_AGENT_ROUTER_HOSTS` allowlist.
+- **Egress:** `@google/genai` uses Node's built-in `fetch`, which has no per-client proxy agent. When `KASE_AGENT_EGRESS_PROXY` is set, the resolver refuses to build a Gemini client unless `NODE_USE_ENV_PROXY=1` and `HTTP(S)_PROXY` equals that proxy (both set on `worker-agent` in Compose).
+- **Thought signatures:** Gemini returns an opaque `thoughtSignature` on function-call parts and requires it back on later turns. The adapter surfaces it as `ProviderToolCall.providerState`; the agent loop stores it on the `tool_use` block unchanged. Other adapters ignore it.
+- **Tools:** only Kase function declarations; Google-hosted tools are never enabled. Thought parts are dropped from the transcript; thinking tokens are counted as output tokens for budgets.
+- **Retries:** SDK retries are disabled (`retryOptions.attempts: 1`); Kase's bounded retry strategy owns retries.
+- **Thinking level:** not set by Kase, so the model default applies (medium for `gemini-4-carbon`).
+
+Catalog entry for Gemini 4 Carbon (administrator-run; confirm `outputLimit` against Google's model card before inserting):
+
+```sql
+INSERT INTO "ModelCatalogEntry"
+  ("id","provider","modelId","catalogRevision","displayName","contextLimit","outputLimit","capabilities",
+   "inputPricePerMToken","outputPricePerMToken","status")
+VALUES
+  ('mcat_gemini4carbon_r1','gemini','gemini-4-carbon',1,'Gemini 4 Carbon',1048576,<outputLimit>,
+   ARRAY['streaming','tool_use'],2.00,10.00,'available');
+```
+
+Introductory pricing ($2 / $10 per 1M tokens) ends Nov 30, 2026; from Dec 1 it is $4 / $20, which is a new `catalogRevision`, not an in-place update.
 
 ### Model pinning
 

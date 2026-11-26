@@ -274,7 +274,7 @@ Two credential modes are supported explicitly — `project_secret` (an active sa
 
 **Rejected.** The original method-per-task interface (`analyze`, `summarize`, `correlate`, `reviewFinding`, `generateReport`, `runAgentLoop`) — the orchestration layer, not the provider adapter, decides what to do with a model turn; collapsing that into the provider interface mixes concerns and makes every new use case a provider-contract change. A single-provider default — a missing configuration should fail loudly, not silently route to one vendor. Automatic alias resolution (`latest`, `sonnet`) — when a provider deprecates a model, the alias silently changes audit behavior and makes prior findings unexplainable.
 
-**Consequence.** Every AI-enabled project requires explicit provider and model selection. No provider is privileged. The Phase 0 LLM provider decision is closed at 15/15.
+**Consequence.** Every AI-enabled project requires explicit provider and model selection. No provider is privileged. A third adapter (Gemini API) was later added behind the same interface without changing it, other than an opaque `providerState` echo field on tool calls for Gemini thought signatures. The Phase 0 LLM provider decision is closed at 15/15.
 
 ---
 
