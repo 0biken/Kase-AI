@@ -1,23 +1,6 @@
 import Link from 'next/link';
-import { KaseMark } from '@/components/kase-mark';
 import CorrelationVisual from './correlation-visual';
-// Loaded after globals.css so the depth/glow layer overrides the flat base.
-import './dashboard.css';
-
-/**
- * Nav items the platform does not serve yet are rendered as disabled, not as
- * links. Previously they were <span>s styled identically to real links —
- * indistinguishable, and a dead click every time.
- */
-type NavItem = { label: string; href: string | null; active?: boolean };
-
-const NAV: NavItem[] = [
-  { label: 'Overview', href: '/dashboard', active: true },
-  { label: 'Audits', href: null },
-  { label: 'Findings', href: null },
-  { label: 'Reports', href: null },
-  { label: 'Documentation', href: '/docs' },
-];
+import { DashShell } from './dash-shell';
 
 /**
  * Honest platform state, taken from the gate ledgers (GATES*.md) and TASKS.md.
@@ -33,7 +16,7 @@ const READINESS = [
   { state: 'built', label: 'Agent runtime', detail: 'Local gates pass; live provider proof deferred' },
   { state: 'built', label: 'Correlation', detail: 'Route to source-symbol join; gates open' },
   { state: 'built', label: 'Release gate', detail: 'Policies, waivers, evaluation API and CLI' },
-  { state: 'next', label: 'Workspace screens', detail: 'Audits, findings and gate views in this dashboard' },
+  { state: 'built', label: 'Workspace screens', detail: 'Audits, findings and gate status; more to come' },
 ] as const;
 
 const READINESS_LABEL = { done: 'Ready', built: 'In verification', next: 'Not started' } as const;
@@ -44,67 +27,18 @@ const DOCS = [
   { title: 'Correlation', detail: 'The route to source-symbol join', href: '/docs#correlation' },
 ];
 
-/** The dashboard itself, with no auth of its own: callers decide who may see it. */
-export function DashboardView({ email }: { email: string }) {
+/** The Overview screen, with no auth of its own: callers decide who may see it. */
+export function DashboardView({ email, basePath }: { email: string; basePath?: string }) {
   return (
-    <div className="dash">
-      <Sidebar />
-      <main className="dash-main">
-        <header className="dash-header">
-          <div>
-            <p className="dash-eyebrow">Workspace</p>
-            <h1 className="dash-title">Overview</h1>
-          </div>
-          <div className="dash-account">
-            <span className="dash-account-email">{email}</span>
-            <span className="dash-account-meta">Invite-only workspace</span>
-          </div>
-        </header>
-
-        <div className="dash-stack">
-          <Setup />
-          <div className="dash-split">
-            <Readiness />
-            <Documentation />
-          </div>
+    <DashShell title="Overview" email={email} active="overview" basePath={basePath}>
+      <div className="dash-stack">
+        <Setup />
+        <div className="dash-split">
+          <Readiness />
+          <Documentation />
         </div>
-      </main>
-    </div>
-  );
-}
-
-function Sidebar() {
-  return (
-    <aside className="dash-side">
-      <Link className="dash-brand" href="/">
-        <KaseMark size={22} />
-        <span>Kase</span>
-      </Link>
-
-      <nav className="dash-nav" aria-label="Workspace">
-        {NAV.map((item) =>
-          item.href ? (
-            <Link
-              key={item.label}
-              className="dash-nav-item"
-              href={item.href}
-              aria-current={item.active ? 'page' : undefined}
-            >
-              {item.label}
-            </Link>
-          ) : (
-            <span key={item.label} className="dash-nav-item is-disabled" aria-disabled="true">
-              {item.label}
-              <span className="dash-nav-soon">Soon</span>
-            </span>
-          ),
-        )}
-      </nav>
-
-      <p className="dash-side-note">
-        Workspace data appears here once a repository and target are connected.
-      </p>
-    </aside>
+      </div>
+    </DashShell>
   );
 }
 
