@@ -1,4 +1,6 @@
 import { Project } from 'ts-morph';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { CorrelationEngine } from './correlation-engine.service';
 import { buildNestGraph, nestStaticRoutes } from './nest-source-graph';
 import { ingestOpenApi, resolveRoutes } from './route-resolution';
@@ -70,6 +72,16 @@ describe('M5 deterministic correlation core', () => {
     input.routes.push({ ...input.routes[0], id: 'ambiguous', handler: { ...input.routes[0].handler, file: 'other.ts' } });
     expect(engine.correlate(input).correlated).toEqual([]);
   });
+  it('does not collapse distinct categories at the same source into one finding', () => {
+    const { input, engine } = fixture();
+    input.whitebox.push({ ...input.whitebox[0], id: 'other-category', category: 'static_security' });
+    expect(engine.correlate(input)).toEqual({ correlated: [], uncorrelatedIds: ['bb', 'other-category', 'wb'] });
+  });
+  it('rejects a source match backed only by truncated scanner evidence', () => {
+    const { input, engine } = fixture();
+    input.evidence[1].truncated = true;
+    expect(engine.correlate(input)).toEqual({ correlated: [], uncorrelatedIds: ['bb', 'wb'] });
+  });
   it('selects the deepest matching symbol and leaves shallower independent findings intact', () => {
     const { input, engine } = fixture();
     input.whitebox.push({ ...input.whitebox[0], id: 'deep', sourceLocations: [{ ...input.whitebox[0].sourceLocations[0], enclosingSymbol: 'InvoiceService.query' }] });
@@ -107,12 +119,70 @@ describe('M5 route ranking and OpenAPI', () => {
     expect(resolveRoutes('GET', '/api/invoices/current', [...input.routes, exact])).toEqual([exact]);
     expect(resolveRoutes('GET', '/API/invoices/1', input.routes)).toEqual([]);
   });
+  it('preserves empty segments and trailing slashes instead of assuming server rewrites', () => {
+    const { input } = fixture();
+    for (const observed of ['/api//invoices/1', '/api/invoices//1', '/api/invoices/1/']) {
+      expect(resolveRoutes('GET', observed, input.routes)).toEqual([]);
+    }
+    const trailing = { ...input.routes[0], id: 'trailing', pathTemplate: '/api/invoices/:id/' };
+    expect(resolveRoutes('GET', '/api/invoices/1/', [trailing])).toEqual([trailing]);
+  });
   it('never invents handlers from operationId or external refs', () => {
     expect(ingestOpenApi({ openapi: '3.0.3', paths: { '/unmapped': { get: { operationId: 'InvoiceService.find' } }, '/external': { $ref: 'https://elsewhere.test/routes' } } }, [])).toEqual([]);
   });
 });
 
 describe('M5 bounded Nest source graph', () => {
+  it('correlates the real IDOR fixture through its explicit class injection and rejects the ownership-fixed route', () => {
+    const { input, engine } = fixture();
+    const sourceRoot = resolve(__dirname, '../../../../fixtures/vulnerable-app');
+    const project = new Project({ useInMemoryFileSystem: true, skipAddingFilesFromTsConfig: true });
+    for (const file of ['invoices/invoice.controller.ts', 'invoices/invoice.service.ts', 'db.ts']) {
+      project.createSourceFile('/fixture/' + file, readFileSync(resolve(sourceRoot, file), 'utf8'));
+    }
+    const routes = nestStaticRoutes(project, '/fixture');
+    const route = routes.find(item => item.handler.enclosingSymbol === 'InvoiceController.findOne')!;
+    const graph = buildNestGraph(project, '/fixture', route)!;
+    expect(graph.reachable.map(item => item.enclosingSymbol)).toContain('InvoiceService.find');
+    input.routes = routes;
+    input.graphs = new Map([[symbolKey(route.handler), graph]]);
+    input.whitebox[0].sourceLocations[0].file = 'invoices/invoice.service.ts';
+    const result = engine.correlate(input);
+    expect(result.correlated).toHaveLength(1);
+    expect(result.correlated[0]).toMatchObject({ evidenceIds: ['http', 'sast'], verified: true,
+      sourceLocation: { file: 'invoices/invoice.service.ts', enclosingSymbol: 'InvoiceService.find' } });
+    input.provenance = null;
+    expect(engine.correlate(input).correlated[0]).toMatchObject({ verified: false, gateEligible: false });
+    const controller = project.getSourceFileOrThrow('/fixture/invoices/invoice.controller.ts');
+    controller.replaceWithText(controller.getFullText().replace('this.invoiceService.find(id, requesterId)', 'this.invoiceService.findScoped(id, requesterId)'));
+    const fixedRoute = nestStaticRoutes(project, '/fixture').find(item => item.handler.enclosingSymbol === 'InvoiceController.findOne')!;
+    input.graphs = new Map([[symbolKey(fixedRoute.handler), buildNestGraph(project, '/fixture', fixedRoute)!]]);
+    expect(engine.correlate(input)).toEqual({ correlated: [], uncorrelatedIds: ['bb', 'wb'] });
+  });
+
+  it.each([
+    ["@Inject(Actual)", true],
+    ["@Alias(Actual)", true],
+    ["@Inject('INVOICES')", false],
+    ["@Inject(Other)", false],
+    ["@Inject(() => Actual)", false],
+    ["@Custom(Actual)", false],
+  ])('resolves only a matching Nest class token: %s', (decorator, reachable) => {
+    const { project } = fixture();
+    project.createSourceFile('/src/explicit.ts', `
+      import {Controller, Get, Inject, Inject as Alias} from '@nestjs/common';
+      import {InvoiceService as Actual} from './service';
+      import {InvoiceService as Other} from './other';
+      function Custom(token: unknown) { return () => {}; }
+      @Controller('explicit') class Explicit {
+        constructor(${decorator} private service: Actual) {}
+        @Get() handler() { return this.service.find(); }
+      }`);
+    const route = nestStaticRoutes(project, '/src').find(item => item.handler.enclosingSymbol === 'Explicit.handler')!;
+    const graph = buildNestGraph(project, '/src', route)!;
+    expect(graph.reachable.some(item => item.file === 'service.ts' && item.enclosingSymbol === 'InvoiceService.find')).toBe(reachable);
+  });
+
   it('resolves aliased imports and same-class calls without crossing same-name classes', () => {
     const { graph } = fixture();
     expect(graph.reachable.map(source => [source.file, source.enclosingSymbol])).toEqual([

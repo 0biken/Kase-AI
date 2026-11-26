@@ -38,7 +38,10 @@ export class CorrelationEngine {
       for (const whitebox of input.whitebox) {
         if (whitebox.auditId !== input.auditId || !COMPATIBLE[blackbox.category]?.includes(whitebox.category)) continue;
         if (blackbox.cwe && whitebox.cwe && blackbox.cwe !== whitebox.cwe) continue;
-        if (!whitebox.evidenceIds.some(id => ['sast_json', 'source_excerpt'].includes(evidence.get(id)?.type ?? ''))) continue;
+        if (!whitebox.evidenceIds.some(id => {
+          const sourceEvidence = evidence.get(id);
+          return sourceEvidence && !sourceEvidence.truncated && ['sast_json', 'source_excerpt'].includes(sourceEvidence.type);
+        })) continue;
         for (const location of whitebox.sourceLocations) {
           if (!location.verified || location.commitSha.toLowerCase() !== input.checkoutCommit.toLowerCase()) continue;
           const source = reachable.get(symbolKey(location));
@@ -48,7 +51,7 @@ export class CorrelationEngine {
       if (!candidates.length) continue;
       const depth = Math.max(...candidates.map(candidate => candidate.source.depth));
       const deepest = candidates.filter(candidate => candidate.source.depth === depth);
-      const roots = new Map(deepest.map(candidate => [JSON.stringify([symbolKey(candidate.source), candidate.finding.ruleId, candidate.finding.cwe]), candidate]));
+      const roots = new Map(deepest.map(candidate => [JSON.stringify([symbolKey(candidate.source), candidate.finding.category, candidate.finding.ruleId, candidate.finding.cwe]), candidate]));
       if (roots.size !== 1) continue;
       const { finding: whitebox, source } = [...roots.values()][0];
       const verified = Boolean(input.provenance?.verified && input.provenance.commitSha?.toLowerCase() === input.checkoutCommit.toLowerCase());
