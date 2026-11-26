@@ -1,4 +1,5 @@
 import { gateCategoriesFor } from './gate-categories';
+import { applyAuditOutcome } from '../findings/finding-review.service';
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { MAX_JOBS_PER_AUDIT } from '../queue/queue.config';
@@ -157,6 +158,11 @@ export class AuditSchedulerService {
       executedCategories, notExecutedCategories, completedAt: new Date(),
     } });
     if (reasons.length > 0) await appendEventInTransaction(tx, audit.id, 'audit.degraded', { reasons });
+    // Lifecycle observation (09-findings §6). Only a completed audit can mark a
+    // finding absent, and only for categories that actually succeeded.
+    const changes = await applyAuditOutcome(tx, { projectId: audit.projectId, auditId: audit.id, completed: status === 'completed',
+      succeededCategories: [...new Set(jobs.filter((job) => job.status === 'succeeded' && job.category).map((job) => job.category!))] });
+    if (changes.length > 0) await appendEventInTransaction(tx, audit.id, 'finding.lifecycle', { changes });
     await appendEventInTransaction(tx, audit.id, 'audit.status', { status });
   }
 

@@ -80,6 +80,18 @@ export class KaseClient {
     return this.request(`/audits/${auditId}/import/security-audit`, { method: 'POST', body: JSON.stringify(findings) });
   }
 
+  transitionFinding(projectId: string, identityId: string, decision: string, reason: string): Promise<Record<string, unknown>> {
+    return this.request(`/projects/${projectId}/finding-identities/${identityId}/transition`, { method: 'POST', body: JSON.stringify({ decision, reason }) });
+  }
+
+  dedupQueue(projectId: string): Promise<unknown[]> {
+    return this.request(`/projects/${projectId}/dedup-queue`);
+  }
+
+  decideDedup(projectId: string, relationId: string, decision: 'confirm' | 'reject', rationale: string): Promise<Record<string, unknown>> {
+    return this.request(`/projects/${projectId}/dedup-queue/${relationId}/decision`, { method: 'POST', body: JSON.stringify({ decision, rationale }) });
+  }
+
   listFindings(auditId: string, filters: Record<string, string | undefined>): Promise<unknown> {
     const query = new URLSearchParams();
     for (const [key, value] of Object.entries(filters)) if (value) query.set(key, value);

@@ -6,12 +6,12 @@ Executable form of [19 — Roadmap](docs/19-roadmap/README.md). Ordered by depen
 
 **What "done" means from M4 on:** `[x]` = implemented, with passing local tests (unit, contract, or loopback). It does **not** mean live-proven. Live proof is tracked only by the exit criteria and by the gate ledgers ([GATES-M4.md](GATES-M4.md), [GATES-M5.md](GATES-M5.md)). No M4–M7 exit criterion has passed yet, mainly because the live Compose proofs need Docker and provider keys, which this machine doesn't have.
 
-**130 tasks, 84 done, 11 partial** (as of 2026-11-26). Counts are derived from milestone and invariant checkboxes, including exit criteria; the five deferred items are excluded.
+**130 tasks, 88 done, 8 partial** (as of 2026-11-26). Counts are derived from milestone and invariant checkboxes, including exit criteria; the five deferred items are excluded.
 
 | | Phase 0 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | Invariants |
 |---|---|---|---|---|---|---|---|---|---|
-| Done | 15 | 16 | 18 | 9 | 10 | 7 | 9 | 0 | 0 |
-| Partial | – | – | – | – | 3 | 3 | 2 | 3 | – |
+| Done | 15 | 16 | 18 | 9 | 10 | 11 | 9 | 0 | 0 |
+| Partial | – | – | – | – | 3 | 0 | 2 | 3 | – |
 | Total | 15 | 16 | 18 | 9 | 15 | 14 | 16 | 19 | 8 |
 | Exit proven | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | – |
 
@@ -160,7 +160,7 @@ Non-code work that blocks code. ADR-017 closes the provider decision; M4 impleme
 
 > Several assumptions here are already validated by [`spike/correlation/`](spike/correlation/README.md) — route dump, the controller→service walk, symbol-keyed fingerprints, and reachability filtering. This milestone is largely hardening and generalizing that work, not discovering it.
 
-> **Status:** the deterministic core and route-map adapters are done. GATES-M5 G1 (correlation core), G2 (bounded code map), G3 (commit-bound route artifacts, 53 tests) and G7 (543 API tests plus `tsc`) pass. G4–G6 are pending: durable worker integration, dedup and lifecycle.
+> **Status:** everything that can be built without Docker is done. GATES-M5 G1–G3, G5 (dedup, 51 tests), G6 (lifecycle, 56 tests) and G7 (571 API tests plus `tsc`) pass. G4, durable integration through real workers and the live proof of both exit criteria, is pending on Docker. Layer-4 AI correlation is not started.
 
 - [x] `kase-routemap` for NestJS — runtime dump of the live DI container (`adapters/routemap/nest-route-dump.ts`, runner `routemap-nest-main.ts`), bound to source by `nestSymbolLocator` (G3). Worker-image packaging is part of G4
 - [x] `kase-routemap` for FastAPI — `workers/routemap/fastapi_dump.py` dumps `app.routes`, bound to source by `python-symbols.ts` (G3)
@@ -170,10 +170,10 @@ Non-code work that blocks code. ADR-017 closes the provider decision; M4 impleme
 - [x] **Reachability filtering** — static findings on unreachable code must not correlate (G1 negative controls)
 - [ ] Layer 4 AI inference as **advisory only**, ordinal confidence, never numeric thresholds
 - [x] Fingerprinting on deterministic inputs only — SHA-256 over structural inputs in `correlation-engine.service.ts`
-- [~] Three-level dedup: exact → semantic → AI-assisted, emitting `MATCH`/`POSSIBLE_MATCH`/`NEW_FINDING` — `FindingRelation` schema only; no matcher (G5)
-- [ ] `POSSIBLE_MATCH` routes to a human queue, never auto-resolves
-- [~] Finding lifecycle: `NEW`, `OPEN`, `FIXED`, `VERIFIED`, `REGRESSED`, `NOT_REPRODUCED`, `FALSE_POSITIVE`, `ACCEPTED_RISK` — statuses exist on `FindingIdentity`; no authorized transition service or API (G6)
-- [~] Suppression store keyed on fingerprint, fed by `FALSE_POSITIVE` — fingerprint-keyed store and API exist (M6 Workstream C); not yet fed by a lifecycle transition
+- [x] Three-level dedup: exact → semantic → AI-assisted, emitting `MATCH`/`POSSIBLE_MATCH`/`NEW_FINDING` — `findings/dedup.ts` + `runDedup`, wired into agent `create_finding`; the AI advisor port defaults to proposing nothing (G5)
+- [x] `POSSIBLE_MATCH` routes to a human queue, never auto-resolves — `GET /projects/:id/dedup-queue`, `POST …/:relationId/decision` (approver/admin), `kase dedup list|decide`; rejected pairs are never re-proposed (G5)
+- [x] Finding lifecycle: `NEW`, `OPEN`, `FIXED`, `VERIFIED`, `REGRESSED`, `NOT_REPRODUCED`, `FALSE_POSITIVE`, `ACCEPTED_RISK` — `findings/lifecycle.ts` transition table, `POST /projects/:id/finding-identities/:identityId/transition`, `kase findings transition`, and observation applied on audit settlement (G6)
+- [x] Suppression store keyed on fingerprint, fed by `FALSE_POSITIVE` — the false_positive decision creates exactly one suppression, and reopen removes it (G6)
 
 **Exit criteria**
 - [ ] The fixture's IDOR produces exactly one correlated finding pointing at the service method, with both evidence artifacts preserved — proven in unit tests against the real fixture source; not yet through real workers (G4)

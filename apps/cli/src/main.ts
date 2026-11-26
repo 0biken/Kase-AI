@@ -24,7 +24,48 @@ export async function run(argv: string[], env: NodeJS.ProcessEnv, io: Io, fetche
   if (group === 'gate' && action === 'evaluate') return evaluateGate(client, rest, io);
   if (group === 'gate' && action === 'show') return showGate(client, rest, io);
   if (group === 'import' && action === 'security-audit') return importSecurityAudit(client, rest, io);
-  throw new Error('Usage: kase audit start ... | kase findings list ... | kase gate evaluate|show ... | kase import security-audit ...');
+  if (group === 'findings' && action === 'transition') return transitionFinding(client, rest, io);
+  if (group === 'dedup' && action === 'list') return listDedup(client, rest, io);
+  if (group === 'dedup' && action === 'decide') return decideDedup(client, rest, io);
+  throw new Error('Usage: kase audit start ... | kase findings list|transition ... | kase dedup list|decide ... | kase gate evaluate|show ... | kase import security-audit ...');
+}
+
+const DECISIONS = ['false_positive', 'accepted_risk', 'reopen', 'confirm_fixed'];
+
+/** Records a lifecycle decision on a finding identity; the API enforces who may make it. */
+async function transitionFinding(client: KaseClient, args: string[], io: Io): Promise<number> {
+  const v = parseArgs({ args, strict: true, options: { project: { type: 'string' }, identity: { type: 'string' }, decision: { type: 'string' },
+    reason: { type: 'string' }, json: { type: 'boolean', default: false } } }).values;
+  if (!v.project || !v.identity || !v.decision || !v.reason) throw new Error('Usage: kase findings transition --project <id> --identity <id> --decision <decision> --reason <text>');
+  if (!DECISIONS.includes(v.decision)) throw new Error(`--decision must be one of ${DECISIONS.join(', ')}`);
+  const result = await client.transitionFinding(await resolveProject(client, v.project), v.identity, v.decision, v.reason);
+  if (v.json) io.out(JSON.stringify(result)); else io.out(`${v.identity}: ${String(result.status)}`);
+  return 0;
+}
+
+/** Lists POSSIBLE_MATCH proposals waiting for a human decision. */
+async function listDedup(client: KaseClient, args: string[], io: Io): Promise<number> {
+  const v = parseArgs({ args, strict: true, options: { project: { type: 'string' }, json: { type: 'boolean', default: false } } }).values;
+  if (!v.project) throw new Error('--project is required');
+  const queue = await client.dedupQueue(await resolveProject(client, v.project)) as Array<Record<string, any>>;
+  if (v.json) { io.out(JSON.stringify(queue)); return 0; }
+  if (!queue.length) { io.out('no proposals waiting'); return 0; }
+  for (const item of queue) {
+    io.out(`${item.id}  level ${item.level} (${item.confidenceBand})`);
+    io.out(`  new:       ${item.finding?.title ?? '?'} [${item.finding?.identity?.fingerprint ?? '?'}]`);
+    io.out(`  candidate: ${item.candidate?.title ?? '?'} [${item.candidate?.identity?.fingerprint ?? '?'}]`);
+  }
+  return 0;
+}
+
+async function decideDedup(client: KaseClient, args: string[], io: Io): Promise<number> {
+  const v = parseArgs({ args, strict: true, options: { project: { type: 'string' }, proposal: { type: 'string' }, decision: { type: 'string' },
+    rationale: { type: 'string' }, json: { type: 'boolean', default: false } } }).values;
+  if (!v.project || !v.proposal || !v.decision || !v.rationale) throw new Error('Usage: kase dedup decide --project <id> --proposal <id> --decision confirm|reject --rationale <text>');
+  if (v.decision !== 'confirm' && v.decision !== 'reject') throw new Error('--decision must be confirm or reject');
+  const result = await client.decideDedup(await resolveProject(client, v.project), v.proposal, v.decision, v.rationale);
+  if (v.json) io.out(JSON.stringify(result)); else io.out(`${v.proposal}: ${String(result.status)}`);
+  return 0;
 }
 
 /** Imports cloudflare/security-audit-skill `findings.json`; imported findings are warn-only and never gate-eligible. */

@@ -41,13 +41,21 @@ describe('orchestrator durable scheduler', () => {
         { agentRole: 'security_audit_import', category: 'security', outcome: 'finding' },
       ]) },
       auditEvent: { create: jest.fn(), findFirst: jest.fn(), aggregate: jest.fn().mockResolvedValue({ _max: { sequence: 0 } }) },
+      // Lifecycle observation: one open SAST identity that this completed audit did not see.
+      finding: { findMany: jest.fn().mockResolvedValue([]) },
+      findingIdentity: {
+        findMany: jest.fn().mockResolvedValue([{ id: 'fid', status: 'open', firstSeenAuditId: 'old', findings: [{ origin: 'tool', reproduction: { kind: 'source_location' } }] }]),
+        update: jest.fn(),
+      },
     };
     const prisma: any = { $transaction: jest.fn((fn) => fn(tx)), auditJob: { update: jest.fn() } };
     const scheduler = new AuditSchedulerService(prisma, { enqueue: jest.fn() } as never, { reclaimExpired: jest.fn() } as never);
-    await scheduler.advance('aud').catch(() => undefined);
+    await scheduler.advance('aud');
     expect(tx.agentCoverageResult.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { auditId: 'aud' } }));
     const executed = tx.audit.update.mock.calls[0][0].data.executedCategories;
     expect(executed).toEqual(expect.arrayContaining(['sast', 'static_security', 'whitebox', 'authz', 'security']));
+    expect(tx.findingIdentity.update).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 'fid' }, data: expect.objectContaining({ status: 'not_reproduced', statusDecidedBy: 'system' }) }));
+    expect(tx.auditEvent.create.mock.calls.map((c: any) => c[0].data.type)).toContain('finding.lifecycle');
   });
 
   it('claims once, increments attempts, and establishes a renewable lease', async () => {

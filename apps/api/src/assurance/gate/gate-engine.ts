@@ -187,6 +187,14 @@ export function evaluateGate(input: GateInput): GateDecision {
     // entirely — it is not even warned (12-policy-gate §9).
     if (suppressed.has(f.fingerprint)) continue;
 
+    // Human lifecycle decisions are never gate-eligible (09-findings §8). An
+    // accepted risk stays visible as a warning; a false positive with no
+    // suppression row yet is treated the same way rather than blocking.
+    if (f.identityStatus === 'accepted_risk' || f.identityStatus === 'false_positive') {
+      warnings.push({ findingId: f.findingId, fingerprint: f.fingerprint, reason: `not gate-eligible: finding is ${f.identityStatus}` });
+      continue;
+    }
+
     const eligibleEvidence = blockEligibleEvidence(f);
     const hasReplayable = eligibleEvidence.length > 0;
 

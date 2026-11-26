@@ -7,6 +7,11 @@ describe('M4 capability security and persistence', () => {
     const evidence = { id: 'ev', auditId: 'audit', type: 'http_exchange', replayable: true, truncated: false, metadata: { url: 'https://target.test/invoices/1' } };
     const db: any = { audit: { findFirst: jest.fn().mockResolvedValue({ id: 'audit', status: 'running', cancellationRequestedAt: null, target: { baseUrl: 'https://target.test' } }), update: jest.fn() }, evidence: { findMany: jest.fn().mockResolvedValue([evidence]) }, findingIdentity: { upsert: jest.fn().mockResolvedValue({ id: 'identity' }), update: jest.fn() }, finding: { findUnique: jest.fn().mockResolvedValue(null), upsert: jest.fn() }, agentCoverageResult: { upsert: jest.fn() }, agentRun: { update: jest.fn() }, passingCheck: { upsert: jest.fn() }, endpointInventory: { findFirst: jest.fn().mockResolvedValue(null) }, testIdentity: { findMany: jest.fn().mockResolvedValue([]) } };
     db.$transaction = (fn: any) => fn(db);
+    // Pass 2 dedup reads: a first occurrence with no other identities to compare against.
+    db.finding.findFirst = jest.fn().mockResolvedValue({ id: 'finding', auditId: 'audit', category: 'authorization', cwe: 'CWE-639', severity: 'high', title: 't', description: 'd', affectedTarget: 'GET https://target.test/invoices/1',
+      identity: { id: 'identity', projectId: 'project', fingerprint: 'fp', firstSeenAuditId: 'audit', occurrences: 1, mergedIntoIdentityId: null }, _count: { sourceLocations: 0 } });
+    db.findingIdentity.findMany = jest.fn().mockResolvedValue([]);
+    db.findingRelation = { findMany: jest.fn().mockResolvedValue([]), upsert: jest.fn() };
     const trail = { record: jest.fn() }; const events = { append: jest.fn() };
     const executor = new CapabilityExecutor(db, trail as any, events as any, {} as any, {} as any);
     const call = (name: string, args: unknown, role = 'blackbox', attempt = 0) => executor.execute('audit','project','parent',role,0,'call',name,args,attempt);

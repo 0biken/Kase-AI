@@ -4,6 +4,7 @@ import { AuditTrailService } from '../../audit-trail/audit-trail.service';
 import { AuditEventsService } from '../../audit-events/audit-events.service';
 import { DurableQueueDispatcher } from '../../queue/durable-queue-dispatcher';
 import { deterministicId, upsertFindingOccurrence } from '../../findings/finding-persistence.service';
+import { runDedup } from '../../findings/finding-review.service';
 import { CapabilitySchema, CapabilityArgs } from './capability.schemas';
 import { computeSeverity, computeFingerprint, syntheticRuleKey } from './finding-authority';
 import { MAX_VALIDATION_CORRECTIONS } from '../budget/budget-defaults';
@@ -67,6 +68,9 @@ export class CapabilityExecutor {
           const metadata = reproduction.metadata as Record<string, unknown> | null;
           const endpoint = typeof metadata?.url === 'string' ? new URL(metadata.url).pathname : '';
           const target = audit.target?.baseUrl ?? audit.repository?.url ?? '';
+          // The affected target is the observed endpoint when the reproduction is an HTTP exchange; dedup keys on it.
+          const observedMethod = typeof metadata?.method === 'string' ? metadata.method.toUpperCase() : 'GET';
+          const affectedTarget = typeof metadata?.url === 'string' && reproduction.type === 'http_exchange' ? `${observedMethod} ${metadata.url}` : target;
           const ruleId = syntheticRuleKey(origin, args.category);
           const fingerprint = computeFingerprint({ category: args.category, ruleKey: ruleId, target, endpoint, cwe: args.cwe });
           const locations: Array<{ id: string; file: string; enclosingSymbol: string; line: number; commitSha: string; verified: boolean }> = [];
@@ -78,7 +82,9 @@ export class CapabilityExecutor {
           let findingId = '';
           await this.prisma.$transaction(async tx => {
             ({ findingId } = await upsertFindingOccurrence(tx, { projectId, auditId, fingerprint, severity: severity.severity,
-              create: { origin, category: args.category, ruleId, cwe: args.cwe, title: args.title, ...severity, affectedTarget: target, description: args.impact, reproduction: args.reproduction, impact: args.impact, fix: args.remediation, fixPatch: args.remediationPatch, confidenceBand: 'medium', aiGenerated: true, gateEligible: false, sourceLocations: { create: locations }, findingEvidence: { create: ids.map(evidenceId => ({ evidenceId, role: 'primary' })) } } }));
+              create: { origin, category: args.category, ruleId, cwe: args.cwe, title: args.title, ...severity, affectedTarget, description: args.impact, reproduction: args.reproduction, impact: args.impact, fix: args.remediation, fixPatch: args.remediationPatch, confidenceBand: 'medium', aiGenerated: true, gateEligible: false, sourceLocations: { create: locations }, findingEvidence: { create: ids.map(evidenceId => ({ evidenceId, role: 'primary' })) } } }));
+            // Pass 2 dedup; a MATCH may merge this occurrence into an existing one.
+            ({ findingId } = await runDedup(tx, { projectId, auditId, findingId }));
             await tx.agentCoverageResult.upsert({ where: { auditId_agentRole_category: { auditId, agentRole, category: args.category } }, create: { id: deterministicId('coverage', `${auditId}:${agentRole}:${args.category}`), auditId, agentRole, category: args.category, outcome: 'finding' }, update: { outcome: 'finding', blockedReason: null } });
           });
           return { success: true, data: { findingId, ...severity, gateEligible: false } };
