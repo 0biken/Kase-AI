@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { readFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { parseArgs } from 'node:util';
 import { ApiError, AuditRecord, GateDecision, GateOutcome, KaseClient, resolveNamed, resolveProject } from './client';
 
@@ -23,11 +24,12 @@ export async function run(argv: string[], env: NodeJS.ProcessEnv, io: Io, fetche
   if (group === 'findings' && action === 'list') return listFindings(client, rest, io);
   if (group === 'gate' && action === 'evaluate') return evaluateGate(client, rest, io);
   if (group === 'gate' && action === 'show') return showGate(client, rest, io);
+  if (group === 'report' && action === 'get') return getReport(client, rest, io);
   if (group === 'import' && action === 'security-audit') return importSecurityAudit(client, rest, io);
   if (group === 'findings' && action === 'transition') return transitionFinding(client, rest, io);
   if (group === 'dedup' && action === 'list') return listDedup(client, rest, io);
   if (group === 'dedup' && action === 'decide') return decideDedup(client, rest, io);
-  throw new Error('Usage: kase audit start ... | kase findings list|transition ... | kase dedup list|decide ... | kase gate evaluate|show ... | kase import security-audit ...');
+  throw new Error('Usage: kase audit start ... | kase findings list|transition ... | kase dedup list|decide ... | kase gate evaluate|show ... | kase report get ... | kase import security-audit ...');
 }
 
 const DECISIONS = ['false_positive', 'accepted_risk', 'reopen', 'confirm_fixed'];
@@ -94,6 +96,38 @@ async function showGate(client: KaseClient, args: string[], io: Io): Promise<num
   const parsed = parseArgs({ args, strict: true, options: { audit: { type: 'string' }, json: { type: 'boolean', default: false } } }).values;
   if (!parsed.audit) throw new Error('--audit is required');
   emit(io, parsed.json!, await client.getGate(parsed.audit));
+  return 0;
+}
+
+// A report file name comes from the server; only flat, plain names are written.
+const REPORT_FILE = /^[a-z0-9][a-z0-9-]*\.md$/;
+
+/**
+ * `kase report get --audit <id> [--format markdown|json] [--out dir]` (15-cli §2).
+ * With --out, markdown writes the report folder (00-executive-summary.md, one
+ * file per category, evidence-index.md) and json writes report.json.
+ */
+async function getReport(client: KaseClient, args: string[], io: Io): Promise<number> {
+  const parsed = parseArgs({ args, strict: true, options: {
+    audit: { type: 'string' }, format: { type: 'string', default: 'markdown' }, out: { type: 'string' },
+  } }).values;
+  if (!parsed.audit) throw new Error('--audit is required');
+  const format = parsed.format === 'md' ? 'markdown' : parsed.format;
+  if (format !== 'markdown' && format !== 'json') throw new Error('--format must be markdown or json');
+  const report = await client.getReport(parsed.audit);
+  for (const file of report.files) if (!REPORT_FILE.test(file.path)) throw new Error(`Refusing report file name "${file.path}"`);
+  if (!parsed.out) {
+    io.out(format === 'json' ? JSON.stringify(report) : report.files.map((f) => f.markdown).join('\n---\n\n'));
+    return 0;
+  }
+  await mkdir(parsed.out, { recursive: true });
+  if (format === 'json') {
+    await writeFile(join(parsed.out, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
+    io.out(`wrote ${join(parsed.out, 'report.json')}`);
+  } else {
+    for (const file of report.files) await writeFile(join(parsed.out, file.path), file.markdown);
+    io.out(`wrote ${report.files.length} files to ${parsed.out}`);
+  }
   return 0;
 }
 

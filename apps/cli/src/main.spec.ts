@@ -134,3 +134,47 @@ test('lists and decides dedup proposals', async () => {
     assert.equal(output.at(-1), 'frel_1: confirmed');
     await assert.rejects(run(['dedup', 'decide', '--project', 'prj_1', '--proposal', 'frel_1', '--decision', 'merge', '--rationale', 'x'], env, io, sequenceFetch([])), /confirm or reject/);
   });
+
+const REPORT = {
+  schema: 'kase.report/v1', auditId: 'aud_1', generatedAt: '2026-11-26T00:00:00.000Z', summary: {},
+  files: [
+    { path: '00-executive-summary.md', title: 'Executive Summary', markdown: '# Executive Summary\n' },
+    { path: '02-authn-authz.md', title: 'Authentication & Authorization', markdown: '# Authentication & Authorization\n' },
+    { path: 'evidence-index.md', title: 'Evidence Index', markdown: '# Evidence Index\n' },
+  ],
+};
+
+test('report get writes the report folder with --out, and report.json with --format json', async () => {
+  const { mkdtemp, readFile, readdir, rm } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const dir = await mkdtemp(join(tmpdir(), 'kase-report-'));
+  try {
+    const out = join(dir, 'kase-report');
+    const fetcher = sequenceFetch([response(REPORT)]);
+    const output: string[] = [];
+    assert.equal(await run(['report', 'get', '--audit', 'aud_1', '--format', 'markdown', '--out', out], env, { out: (v) => output.push(v), err: () => undefined }, fetcher), 0);
+    assert.equal(fetcher.calls[0], 'http://kase/api/v1/audits/aud_1/report?format=json');
+    assert.deepEqual((await readdir(out)).sort(), ['00-executive-summary.md', '02-authn-authz.md', 'evidence-index.md']);
+    assert.equal(await readFile(join(out, '00-executive-summary.md'), 'utf8'), '# Executive Summary\n');
+    assert.match(output[0], /wrote 3 files/);
+
+    assert.equal(await run(['report', 'get', '--audit', 'aud_1', '--format', 'json', '--out', out], env, { out: () => undefined, err: () => undefined }, sequenceFetch([response(REPORT)])), 0);
+    assert.equal(JSON.parse(await readFile(join(out, 'report.json'), 'utf8')).schema, 'kase.report/v1');
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test('report get prints the concatenated markdown without --out, summary first', async () => {
+  const output: string[] = [];
+  assert.equal(await run(['report', 'get', '--audit', 'aud_1'], env, { out: (v) => output.push(v), err: () => undefined }, sequenceFetch([response(REPORT)])), 0);
+  assert.ok(output[0].startsWith('# Executive Summary\n'));
+  assert.match(output[0], /# Evidence Index/);
+});
+
+test('report get refuses a server-supplied file name that could escape --out', async () => {
+  const evil = { ...REPORT, files: [{ path: '../../etc/passwd.md', title: 'x', markdown: 'x' }] };
+  await assert.rejects(run(['report', 'get', '--audit', 'aud_1', '--out', 'unused'], env, { out: () => undefined, err: () => undefined }, sequenceFetch([response(evil)])), /Refusing report file name/);
+  await assert.rejects(run(['report', 'get', '--audit', 'aud_1', '--format', 'html'], env, { out: () => undefined, err: () => undefined }, sequenceFetch([])), /markdown or json/);
+});

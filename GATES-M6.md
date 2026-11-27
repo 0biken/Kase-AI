@@ -34,8 +34,10 @@ Docker's Linux engine is unavailable on this machine, so G5 and G8 have no live 
 - [ ] G5: live replay re-issues the stored exchange from a sandboxed recon-egress worker: vulnerable → `reproduced`, fixed → `not_reproduced`, unreachable → `error` with the block standing
   EVIDENCE: pending; the `ReplayVerifier` default fails closed (`error`), and there's no live adapter yet
 
-- [ ] G6: the audit report follows the skills' report structure, builds the executive summary last, and surfaces waivers expiring within `warn_before_expiry_days`
-  EVIDENCE: pending; not implemented
+- [x] G6: the audit report follows the skills' report structure, builds the executive summary last, and surfaces waivers expiring within `warn_before_expiry_days`
+  CHECK: node scripts/verify-m6-report.mjs
+  EXPECT: KASE_M6_REPORT_VERIFIED
+  EVIDENCE: 2026-11-26; exit 0; 18 API tests (golden executive summary, summary-last index, must-fix ranking, expiry warning, escaping, service and route) and 18 CLI tests passed; KASE_M6_REPORT_VERIFIED
 
 - [ ] G7: the GitHub App creates a check run (PARTIAL is never `success`) and one upserted PR comment citing rule, evidence and source location; the published Action exits on the gate outcome
   EVIDENCE: pending; not implemented
@@ -43,4 +45,4 @@ Docker's Linux engine is unavailable on this machine, so G5 and G8 have no live 
 - [ ] G8: a fixture PR carrying the IDOR is blocked with an actionable explanation, and pushing the one-token ownership fix flips the same PR to green
   EVIDENCE: pending; needs G5, G7 and M5 G4
 
-Next: G5 live replay adapter (Track B), plus G6 report generation and G7 GitHub App (Track A), as set out in [PLAN-M4-M7.md](PLAN-M4-M7.md) Phase 4.
+Next: G5 live replay adapter (Track B), plus G7 GitHub App (Track A), as set out in [PLAN-M4-M7.md](PLAN-M4-M7.md) Phase 4.
