@@ -7,23 +7,26 @@ import { FailClosedReplayVerifier, REPLAY_VERIFIER } from './gate/replay-verifie
 import { WaiversController } from './waivers/waivers.controller';
 import { WaiverService } from './waivers/waiver.service';
 import { SuppressionService } from './waivers/suppression.service';
+import { ReportController } from './report/report.controller';
+import { ReportService } from './report/report.service';
 
 /**
  * M6 — Release Assurance. Gate-policy CRUD/versioning, the gate evaluation
- * service, and waiver/suppression management. The replay verifier is bound to
+ * service, waiver/suppression management and the audit report. The replay verifier is bound to
  * its fail-closed default until the live HTTP re-issue adapter lands; the
- * report and integrations follow per M6-PLAN.md. PrismaModule and
+ * integrations follow per M6-PLAN.md. PrismaModule and
  * AuditTrailModule are global.
  */
 @Module({
-  controllers: [GatePolicyController, GateController, WaiversController],
+  controllers: [GatePolicyController, GateController, WaiversController, ReportController],
   providers: [
     GatePolicyService,
     GateEvaluationService,
     WaiverService,
     SuppressionService,
+    ReportService,
     { provide: REPLAY_VERIFIER, useClass: FailClosedReplayVerifier },
   ],
-  exports: [GatePolicyService, GateEvaluationService, WaiverService, SuppressionService],
+  exports: [GatePolicyService, GateEvaluationService, WaiverService, SuppressionService, ReportService],
 })
 export class AssuranceModule {}

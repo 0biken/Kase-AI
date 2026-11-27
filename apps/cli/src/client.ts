@@ -72,6 +72,10 @@ export class KaseClient {
     return this.request(`/audits/${auditId}/gate/evaluate`, { method: 'POST' });
   }
 
+  getReport(auditId: string): Promise<ReportDocument> {
+    return this.request(`/audits/${auditId}/report?format=json`);
+  }
+
   getGate(auditId: string): Promise<unknown> {
     return this.request(`/audits/${auditId}/gate`);
   }
@@ -203,4 +207,12 @@ function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
     timer.unref?.();
     signal?.addEventListener('abort', () => { clearTimeout(timer); reject(new DOMException('Aborted', 'AbortError')); }, { once: true });
   });
+}
+
+export interface ReportDocument {
+  schema: 'kase.report/v1';
+  auditId: string;
+  generatedAt: string;
+  files: Array<{ path: string; title: string; markdown: string }>;
+  summary: Record<string, unknown>;
 }
