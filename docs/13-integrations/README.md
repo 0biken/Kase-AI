@@ -68,7 +68,31 @@ The gate is published as a GitHub check run so branch protection can require it.
 
 Annotations are attached at `file:line` for findings with verified source locations. Unverified correlations are **not** annotated — a wrong inline annotation on a PR is worse than none.
 
+### Running the App (implementation notes)
+
+The App lives in `apps/api/src/integrations/github/` and is off unless these are set:
+
+| Variable | Purpose |
+|---|---|
+| `KASE_GITHUB_APP_ID`, `KASE_GITHUB_APP_SLUG` | The registered App |
+| `KASE_GITHUB_APP_PRIVATE_KEY_FILE` (or `_PRIVATE_KEY`) | App private key, mounted from the deployment's secret store; never stored in the database |
+| `KASE_GITHUB_WEBHOOK_SECRET` | Verifies `X-Hub-Signature-256` over the raw body |
+| `KASE_GITHUB_CLIENT_ID`, `KASE_GITHUB_CLIENT_SECRET` | OAuth during install, to prove the installing user can see the installation |
+| `KASE_WEB_URL` | Dashboard origin for check-run "Details" and the comment's report link |
+| `KASE_GITHUB_API_URL`, `KASE_GITHUB_WEB_URL` | GitHub Enterprise; default github.com |
+
+In the App settings, set the webhook URL to `/api/v1/integrations/github/webhook`, subscribe to **Pull request** and **Check run**, set the setup URL to `/api/v1/integrations/github/callback`, and turn on **Request user authorization (OAuth) during installation**.
+
+How it behaves:
+
+- A PR open or push starts an audit at the head SHA, which gives `ci_supplied` provenance, and creates the check run as `in_progress`. A lease-guarded reconciler publishes the result once the audit settles, so a restart or a GitHub outage delays the result but never loses it. After five failed attempts the check is marked `failure`.
+- Pull requests from forks are not audited unless a project admin enables `auditForks`, because they bring untrusted code to the agents. They get a `neutral` check that says why.
+- **Re-run** on the Kase check re-evaluates the gate for the same audit, picking up waivers approved since. It does not start a new audit.
+- Only a comment Kase's own App authored is updated, so a human comment containing the marker is never overwritten.
+
 ## 2. GitHub Actions
+
+The action is at `.github/actions/kase-gate` (`uses: <owner>/<repo>/.github/actions/kase-gate@<ref>`), with an example workflow at [examples/kase-gate.yml](examples/kase-gate.yml). Inputs reach the script through the environment only, the token is never put on a command line, and a run that cannot start the audit or read the gate fails the job.
 
 ### Workflow
 

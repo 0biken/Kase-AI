@@ -1,0 +1,35 @@
+# Example: gate pull requests on Kase (13-integrations §2).
+# Copy to .github/workflows/kase.yml in the audited repository.
+name: Kase gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  kase:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: kase
+        uses: 0biken/Kase-AI/.github/actions/kase-gate@main
+        with:
+          api-url: ${{ vars.KASE_API_URL }}
+          api-token: ${{ secrets.KASE_TOKEN }}
+          project: acme-web
+          mode: security
+          # commit defaults to the PR head SHA (or github.sha on push), which
+          # gives the audit verified `ci_supplied` provenance.
+          fail-on: fail,partial
+
+      - if: always() && steps.kase.outputs.report-dir != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: kase-report
+          path: ${{ steps.kase.outputs.report-dir }}

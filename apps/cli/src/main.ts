@@ -152,7 +152,9 @@ async function startAudit(client: KaseClient, args: string[], io: Io): Promise<n
     mode: { type: 'string', default: 'full' }, commit: { type: 'string' }, categories: { type: 'string' },
     'budget-minutes': { type: 'string' }, wait: { type: 'boolean', default: false }, json: { type: 'boolean', default: false },
   }}).values;
-  if (!parsed.project || !parsed.target) throw new Error('--project and --target are required');
+  if (!parsed.project) throw new Error('--project is required');
+  // A security audit reads the repository only; smoke and full audits also probe a running target.
+  if (!parsed.target && parsed.mode !== 'security') throw new Error('--target is required for smoke and full audits');
   if (!['smoke', 'security', 'full'].includes(parsed.mode!)) throw new Error('--mode must be smoke, security, or full');
   // Valid categories: sast, http, blackbox, whitebox (M4); security adds the security-audit methodology to the whitebox agent
   const validCategories = ['sast', 'http', 'blackbox', 'whitebox', 'security'];
@@ -162,7 +164,7 @@ async function startAudit(client: KaseClient, args: string[], io: Io): Promise<n
     if (invalid.length) throw new Error(`Invalid categories: ${invalid.join(', ')}. Valid: ${validCategories.join(', ')}`);
   }
   const projectId = await resolveProject(client, parsed.project);
-  const targetId = await resolveNamed(await client.listTargets(projectId), parsed.target, 'tgt', ['id', 'name'], 'target');
+  const targetId = parsed.target ? await resolveNamed(await client.listTargets(projectId), parsed.target, 'tgt', ['id', 'name'], 'target') : undefined;
   const repositories = await client.listRepositories(projectId);
   let repositoryId: string | undefined;
   if (parsed.mode !== 'smoke' || parsed.repository) {
@@ -172,7 +174,7 @@ async function startAudit(client: KaseClient, args: string[], io: Io): Promise<n
   const budget = parsed['budget-minutes'] === undefined ? undefined : Number(parsed['budget-minutes']);
   if (budget !== undefined && (!Number.isInteger(budget) || budget < 1 || budget > 90)) throw new Error('--budget-minutes must be an integer from 1 to 90');
   const audit = await client.startAudit(projectId, {
-    targetId, ...(repositoryId ? { repositoryId } : {}), mode: parsed.mode,
+    ...(targetId ? { targetId } : {}), ...(repositoryId ? { repositoryId } : {}), mode: parsed.mode,
     ...(parsed.commit ? { commitSha: parsed.commit } : {}),
     ...(parsed.categories ? { categories: parsed.categories.split(',').filter(Boolean) } : {}),
     ...(budget ? { maxWallTimeMs: budget * 60_000 } : {}),

@@ -374,9 +374,12 @@ Neither integration is created by a plain `POST` with a credential in the body, 
 ```http
 GET  /api/v1/projects/:id/integrations/github/install-url
 GET  /api/v1/integrations/github/callback      # GitHub redirects here post-install
+GET  /api/v1/projects/:id/integrations/github  # installations and PR audit settings
+PUT  /api/v1/projects/:id/integrations/github  # { mode, targetId?, partialIsFailure?, auditForks? } (admin)
+POST /api/v1/integrations/github/webhook       # pull_request, check_run; HMAC-verified
 ```
 
-The install URL sends the admin to GitHub's own installation screen; the callback exchanges the `installation_id` for the record. Installation tokens are short-lived and resolved per job ([13 §1](../13-integrations/README.md#1-github)) — **no long-lived repository credential is ever stored**, so there is no endpoint that accepts one.
+The install URL sends the admin to GitHub's own installation screen; the callback binds the `installation_id` to the project only when the signed `state` names that project and the installing user's OAuth token can see that installation, so a crafted callback cannot claim someone else's installation. Installation tokens are short-lived and resolved per job ([13 §1](../13-integrations/README.md#1-github)) — **no long-lived repository credential is ever stored**, so there is no endpoint that accepts one.
 
 ### Jira 3LO
 

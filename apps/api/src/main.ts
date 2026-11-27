@@ -6,7 +6,8 @@ import { ProblemDetailsFilter } from './common/problem-details.filter';
 import { applyRouteBodyLimits } from './common/route-body-limits';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  // rawBody: the GitHub webhook verifies its HMAC over the exact bytes sent.
+  const app = await NestFactory.create(AppModule, { rawBody: true });
 
   // 14-api §1: "Base | /api/v1" and "Versioning | URL-versioned".
   app.setGlobalPrefix('api/v1');

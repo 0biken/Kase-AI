@@ -43,6 +43,8 @@ export declare const ID_PREFIX: {
   readonly auditAiBudget: 'abud';
   readonly testIdentity: 'tid';
   readonly agentCoverageResult: 'acov';
+  readonly githubInstallation: 'ghi';
+  readonly githubPrCheck: 'ghpr';
 };
 
 export type IdKind = keyof typeof ID_PREFIX;
