@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kase Partnership Proposal</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;0,600;1,400&family=Poppins:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --dark: #141413;
+    --light: #faf9f5;
+    --mid: #b0aea5;
+    --pale: #e8e6dc;
+    --orange: #d97757;
+    --blue: #6a9bcc;
+    --green: #788c5d;
+    --muted: #5e5d59;
+    --rule: #dcd9cc;
+    --head: "Poppins", Arial, sans-serif;
+    --body: "Lora", Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--pale);
+    color: var(--dark);
+    font: 400 17px/1.65 var(--body);
+  }
+  .sheet {
+    max-width: 860px;
+    margin: 40px auto;
+    background: var(--light);
+    box-shadow: 0 1px 2px rgba(20,20,19,.06), 0 12px 40px rgba(20,20,19,.06);
+  }
+  h1, h2, h3, .eyebrow, .meta, th, .num, .label, .pill { font-family: var(--head); }
+
+  /* Cover */
+  .cover {
+    background: var(--dark);
+    color: var(--light);
+    padding: 72px 72px 64px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::after {
+    content: "";
+    position: absolute;
+    right: -120px; top: -120px;
+    width: 360px; height: 360px;
+    border-radius: 50%;
+    background: var(--orange);
+    opacity: .9;
+  }
+  .cover .eyebrow {
+    position: relative; z-index: 1;
+    font-size: 13px; font-weight: 500;
+    letter-spacing: .14em; text-transform: uppercase;
+    color: var(--mid);
+    margin: 0 0 56px;
+  }
+  .cover h1 {
+    position: relative; z-index: 1;
+    font-size: 46px; line-height: 1.12; font-weight: 600;
+    letter-spacing: -.01em;
+    margin: 0 0 22px;
+    max-width: 14ch;
+  }
+  .cover .lede {
+    position: relative; z-index: 1;
+    font-size: 20px; line-height: 1.55;
+    color: #d6d4cb;
+    max-width: 34em;
+    margin: 0 0 56px;
+  }
+  .cover .meta {
+    position: relative; z-index: 1;
+    display: flex; flex-wrap: wrap; gap: 12px 40px;
+    font-size: 13px; color: var(--mid);
+    border-top: 1px solid #3a3a37;
+    padding-top: 22px;
+  }
+  .cover .meta b { display: block; color: var(--light); font-weight: 500; font-size: 14px; margin-top: 2px; }
+
+  /* Body */
+  main { padding: 16px 72px 72px; }
+  section { padding-top: 48px; }
+  section + section { border-top: 1px solid var(--rule); margin-top: 48px; }
+  .label {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 12px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase;
+    color: var(--orange);
+    margin: 0 0 10px;
+  }
+  .label::before { content: ""; width: 18px; height: 2px; background: currentColor; }
+  h2 { font-size: 28px; line-height: 1.25; font-weight: 600; margin: 0 0 18px; letter-spacing: -.005em; }
+  h3 { font-size: 17px; font-weight: 600; margin: 0 0 6px; line-height: 1.35; }
+  p { margin: 0 0 16px; }
+  .lead { font-size: 19px; }
+  code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: .86em; background: var(--pale); padding: 1px 5px; border-radius: 3px; }
+  .fill {
+    background: #f6e3d9; color: #8a3f22;
+    border-bottom: 1px dashed var(--orange);
+    padding: 0 4px; border-radius: 2px;
+    font-family: var(--head); font-size: .82em; font-weight: 500;
+    white-space: nowrap;
+  }
+
+  /* Ask callout */
+  .ask {
+    margin: 28px 0 8px;
+    border-left: 3px solid var(--orange);
+    padding: 4px 0 4px 22px;
+    font-size: 19px; font-style: italic;
+  }
+
+  /* Capabilities grid */
+  .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; margin: 24px 0; }
+  .card { background: #f1efe7; border-radius: 6px; padding: 20px 22px; }
+  .card p { margin: 0; font-size: 15.5px; line-height: 1.55; color: #33322f; }
+  .card .pill {
+    display: inline-block; font-size: 11px; font-weight: 500; letter-spacing: .08em; text-transform: uppercase;
+    padding: 3px 9px; border-radius: 99px; margin-bottom: 10px; color: var(--light);
+  }
+  .c1 .pill { background: var(--orange); }
+  .c2 .pill { background: var(--blue); }
+  .c3 .pill { background: var(--green); }
+  .c4 .pill { background: var(--dark); }
+
+  /* Flow */
+  .flow { display: flex; align-items: stretch; gap: 0; margin: 28px 0 8px; font-family: var(--head); }
+  .flow div {
+    flex: 1; text-align: center; font-size: 13px; font-weight: 500; line-height: 1.3;
+    padding: 14px 8px; background: #f1efe7; position: relative;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .flow div:not(:last-child)::after {
+    content: ""; position: absolute; right: -9px; top: 50%; transform: translateY(-50%);
+    border: 9px solid transparent; border-left-color: #f1efe7; border-right: 0; z-index: 1;
+  }
+  .flow div:nth-child(odd) { background: var(--pale); }
+  .flow div:nth-child(odd):not(:last-child)::after { border-left-color: var(--pale); }
+  .flow .hl { background: var(--dark) !important; color: var(--light); }
+  .flow .hl::after { border-left-color: var(--dark) !important; }
+  .caption { font-size: 14px; color: var(--muted); font-style: italic; }
+
+  /* Problem stats */
+  .costs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin: 28px 0 24px; }
+  .costs div { border-top: 3px solid var(--orange); padding-top: 14px; }
+  .costs div:nth-child(2) { border-color: var(--blue); }
+  .costs div:nth-child(3) { border-color: var(--green); }
+  .costs p { font-size: 15.5px; line-height: 1.55; color: #33322f; margin: 0; }
+  ul.tight { padding-left: 20px; margin: 0 0 18px; }
+  ul.tight li { margin-bottom: 6px; }
+  ul.tight li::marker { color: var(--orange); }
+
+  /* Controls table */
+  table { width: 100%; border-collapse: collapse; margin: 24px 0 8px; font-size: 15.5px; line-height: 1.5; }
+  th { text-align: left; font-size: 12px; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); padding: 0 16px 10px 0; border-bottom: 2px solid var(--dark); }
+  td { padding: 14px 16px 14px 0; border-bottom: 1px solid var(--rule); vertical-align: top; }
+  td:first-child { font-family: var(--head); font-weight: 500; font-size: 14.5px; width: 31%; }
+
+  /* Proposals */
+  ol.props { list-style: none; padding: 0; margin: 28px 0 0; counter-reset: p; }
+  ol.props li {
+    display: grid; grid-template-columns: 56px 1fr; gap: 0 18px;
+    padding: 22px 0; border-bottom: 1px solid var(--rule);
+  }
+  ol.props li:first-child { padding-top: 0; }
+  ol.props li:last-child { border-bottom: 0; }
+  .num {
+    font-size: 30px; font-weight: 600; line-height: 1; color: var(--orange);
+  }
+  ol.props li:nth-child(3n+2) .num { color: var(--blue); }
+  ol.props li:nth-child(3n) .num { color: var(--green); }
+  ol.props p { margin: 0; font-size: 16px; color: #33322f; }
+
+  /* Commitments */
+  .commit { list-style: none; padding: 0; margin: 20px 0 0; display: grid; gap: 12px; }
+  .commit li { position: relative; padding-left: 32px; }
+  .commit li::before {
+    content: ""; position: absolute; left: 0; top: .45em;
+    width: 16px; height: 9px; border-left: 2.5px solid var(--green); border-bottom: 2.5px solid var(--green);
+    transform: rotate(-45deg);
+  }
+
+  /* Closing */
+  .closing { background: var(--dark); color: var(--light); padding: 56px 72px; }
+  .closing h2 { color: var(--light); }
+  .closing p { color: #d6d4cb; max-width: 36em; }
+  .closing .label { color: var(--orange); }
+  .contact { display: flex; flex-wrap: wrap; gap: 10px 36px; margin-top: 28px; padding-top: 22px; border-top: 1px solid #3a3a37; font-family: var(--head); font-size: 14px; color: var(--mid); }
+  .contact b { display: block; color: var(--light); font-weight: 500; }
+  .closing .fill { background: #3a2a22; color: #f0b9a3; }
+
+  @media (max-width: 720px) {
+    body { font-size: 16px; }
+    .sheet { margin: 0; box-shadow: none; }
+    .cover, .closing { padding: 48px 16px; }
+    .cover::after { width: 220px; height: 220px; right: -90px; top: -90px; }
+    .cover h1 { font-size: 34px; }
+    .cover .lede { font-size: 18px; }
+    main { padding: 8px 16px 48px; }
+    .grid, .costs { grid-template-columns: 1fr; }
+    .flow { flex-direction: column; }
+    .flow div:not(:last-child)::after { display: none; }
+    ol.props li { grid-template-columns: 40px 1fr; }
+    table, thead, tbody, tr, td, th { display: block; }
+    thead { display: none; }
+    td { border: 0; padding: 0 0 4px; }
+    td:first-child { width: auto; }
+    tr { border-bottom: 1px solid var(--rule); padding: 12px 0; }
+    .fill { white-space: normal; }
+  }
+
+  @media print {
+    @page { size: A4; margin: 0; }
+    body { background: var(--light); font-size: 11.5pt; }
+    .sheet { margin: 0; max-width: none; box-shadow: none; }
+    .cover { min-height: 100vh; display: flex; flex-direction: column; justify-content: flex-end; page-break-after: always; }
+    .cover .eyebrow { margin-bottom: auto; }
+    section, ol.props li, tr, .card { break-inside: avoid; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+</head>
+<body>
+<div class="sheet">
+
+  <header class="cover">
+    <p class="eyebrow">Kase &nbsp;·&nbsp; Partnership proposal</p>
+    <h1>A verified path for authorized security audits on Claude</h1>
+    <p class="lede">Kase asks Anthropic to work with us as a verified security partner, so that authorized, scope-controlled audits can run on Claude Opus 5.5 and Claude Fable 5.1 without being blocked.</p>
+    <div class="meta">
+      <span>Prepared for<b>Anthropic Safeguards &amp; Partnerships</b></span>
+      <span>Prepared by<b>Kase</b></span>
+      <span>Date<b>16 October 2026</b></span>
+    </div>
+  </header>
+
+  <main>
+
+    <section>
+      <p class="label">Summary</p>
+      <h2>We'd rather fix this properly than work around it</h2>
+      <p class="lead">Kase is an AI QA and security audit platform. Today, safeguards on Claude Opus 5.5 and Claude Fable 5.1 flag a share of our legitimate audit runs, so we've had to pin production to Claude Opus 4.8.</p>
+      <p>That isn't a lasting answer, for us or for Anthropic. We'd rather show Anthropic exactly how Kase controls its use of Claude, and agree on a vetted way forward.</p>
+      <p class="ask">We're not asking for safeguards to be removed. We're asking for a verified channel, scoped to work our customers have authorized, with an audit trail Anthropic can inspect.</p>
+    </section>
+
+    <section>
+      <p class="label">About Kase</p>
+      <h2>Audits that link what's seen from outside to the code behind it</h2>
+      <p>Kase audits a running system and its source code together. It links each externally observed defect to the exact code that causes it, then turns the result into an automated release decision.</p>
+      <div class="grid">
+        <div class="card c1"><span class="pill">Black box</span><p>Scoped recon, browser testing and API checks against a target the customer owns.</p></div>
+        <div class="card c2"><span class="pill">White box</span><p>Read-only static analysis of the customer's repository. No install, no build, no code execution.</p></div>
+        <div class="card c3"><span class="pill">Correlation</span><p>An external symptom, such as an IDOR on <code>/api/invoices/:id</code>, tied to the controller and line that causes it.</p></div>
+        <div class="card c4"><span class="pill">Release gate</span><p>A policy engine and the <code>kase gate</code> CLI fail closed in CI when blocking findings stay open.</p></div>
+      </div>
+      <div class="flow" aria-label="Kase pipeline">
+        <div>Tools</div><div>Raw evidence</div><div class="hl">Claude reasoning</div><div>Correlation</div><div>Finding</div><div>Release decision</div>
+      </div>
+      <p class="caption">Claude is the reasoning layer. Deterministic infrastructure is the system of record: PostgreSQL, an immutable evidence store and a validated finding schema.</p>
+      <p>Kase today: <span class="fill">[customers]</span> customers, <span class="fill">[projects]</span> projects, and <span class="fill">[runs]</span> audit runs a month.</p>
+    </section>
+
+    <section>
+      <p class="label">The problem</p>
+      <h2><span class="fill" style="font-size:.7em">[X]%</span> of authorized runs are refused on current models</h2>
+      <p>The flagged work is routine, defensive QA on systems our customers own and have attested in writing that we may test:</p>
+      <ul class="tight">
+        <li>confirming a suspected access-control flaw (IDOR, missing ownership check) against the customer's own API;</li>
+        <li>reasoning about injection points found by static analysis and proposing a safe proof request;</li>
+        <li>turning a scanner hit into a reproduction with evidence and a fix.</li>
+      </ul>
+      <div class="costs">
+        <div><h3>Quality</h3><p>Customers don't get the better reasoning in Opus 5.5 and Fable 5.1.</p></div>
+        <div><h3>Safety</h3><p>The newest models also bring the newest safety improvements, and we can't use them.</p></div>
+        <div><h3>Durability</h3><p>When Opus 4.8 is deprecated, Kase has no supported path forward.</p></div>
+      </div>
+      <p class="caption">Appendix: <span class="fill">[3–5 redacted example runs: request IDs, dates, refusal text]</span></p>
+    </section>
+
+    <section>
+      <p class="label">Controls in place</p>
+      <h2>The model never touches a target directly</h2>
+      <p>Every action Claude proposes passes deterministic controls that it can't override.</p>
+      <table>
+        <thead><tr><th>Control</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td>Authorization attestation</td><td>A named person attests authorization before a project exists. It expires after 12 months and is renewed when the target changes.</td></tr>
+          <tr><td>Scope validator</td><td>Every outbound request is checked against an exact host allowlist. Bare TLDs and <code>*</code> are rejected, private ranges are denied, and redirects and discovered URLs are re-checked.</td></tr>
+          <tr><td>No agent egress</td><td>The Claude worker reaches only the LLM provider. Only the Tool Runner issues requests, after validation.</td></tr>
+          <tr><td>Non-destructive by default</td><td><code>DELETE</code>, unsafe writes, intrusive templates and load tests are blocked unless separately attested.</td></tr>
+          <tr><td>Methodology guard</td><td>The agent follows a fixed, versioned audit methodology, and its capability calls are schema-validated.</td></tr>
+          <tr><td>Read-only code analysis</td><td>No install, build or code execution. The worker runs non-root with a seccomp profile.</td></tr>
+          <tr><td>Rate limits and budgets</td><td>Per-host request limits apply across all audits, plus a request budget per audit.</td></tr>
+          <tr><td>Immutable audit trail</td><td>Attestations, scope denials, agent scope-change requests and evidence access are logged and kept indefinitely.</td></tr>
+          <tr><td>Confidential findings</td><td>Findings go only to the customer. Nothing reaches third parties without the customer acting.</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section>
+      <p class="label">Our proposals</p>
+      <h2>Five specific asks</h2>
+      <ol class="props">
+        <li><span class="num">01</span><div><h3>Verified security-org enrollment</h3><p>Enroll Kase's organization in Anthropic's verified security or cyber-defense access program, or tell us the closest equivalent. We'll complete any KYC, use-case review or security questionnaire Anthropic needs.</p></div></li>
+        <li><span class="num">02</span><div><h3>Adjustments scoped to authorized audits</h3><p>Change safeguard behavior only for traffic from Kase's audit worker, in a dedicated workspace or key, and never across our whole organization. Every request there is tied to an attested target and a scope policy.</p></div></li>
+        <li><span class="num">03</span><div><h3>A false-positive feedback loop</h3><p>Give us a named contact or channel for redacted examples of flagged runs that should have passed, with request IDs, so Anthropic can tune its classifiers. We'll send them on a regular schedule.</p></div></li>
+        <li><span class="num">04</span><div><h3>Structured context on each request</h3><p>Agree on metadata Kase attaches to every call: attestation ID, target hosts in scope, audit type and a non-destructive flag. Safeguards could then tell an authorized audit apart from an attack.</p></div></li>
+        <li><span class="num">05</span><div><h3>Design partner for security tooling</h3><p>Kase would test new models and safeguard changes before release on realistic, authorized security workloads, and report regressions both ways: harmful use that gets through, and legitimate work that gets blocked.</p></div></li>
+      </ol>
+    </section>
+
+    <section>
+      <p class="label">In return</p>
+      <h2>What Kase commits to</h2>
+      <ul class="commit">
+        <li>Follow Anthropic's Usage Policy, and shut off any customer who misuses Kase for unauthorized testing.</li>
+        <li>Keep the controls above enforced at the infrastructure level, and tell Anthropic before we weaken any of them.</li>
+        <li>Share a design review of our scope validator and agent isolation, under NDA if Anthropic wants one.</li>
+        <li>Give Anthropic attestation and audit-trail records for any request it asks about.</li>
+        <li>Report suspected misuse of Kase to Anthropic promptly.</li>
+      </ul>
+    </section>
+
+  </main>
+
+  <footer class="closing">
+    <p class="label">Next steps</p>
+    <h2>A 30-minute call to walk through it</h2>
+    <p>We'd welcome time with your safeguards or partnerships team to go through our architecture and the flagged examples. If another team at Anthropic handles this kind of request, please forward this proposal or point us to the right contact.</p>
+    <div class="contact">
+      <span>Contact<b><span class="fill">[name, title]</span></b></span>
+      <span>Email<b><span class="fill">[email]</span></b></span>
+      <span>Web<b><span class="fill">[website]</span></b></span>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>
