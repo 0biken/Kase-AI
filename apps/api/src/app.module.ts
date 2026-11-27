@@ -17,6 +17,7 @@ import { OrganizationsModule } from './organizations/organizations.module';
 import { FindingsModule } from './findings/findings.module';
 import { ReconModule } from './recon/recon.module';
 import { AgentRuntimeModule } from './agent-runtime/agent-runtime.module';
+import { GithubModule } from './integrations/github/github.module';
 
 @Module({
   imports: [
@@ -38,6 +39,7 @@ import { AgentRuntimeModule } from './agent-runtime/agent-runtime.module';
     SecretsModule,
     OrganizationsModule,
     AgentRuntimeModule,
+    GithubModule,
   ],
   controllers: [AppController],
   providers: [AppService],

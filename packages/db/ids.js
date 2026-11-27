@@ -54,6 +54,8 @@ const ID_PREFIX = {
   auditAiBudget: 'abud',
   testIdentity: 'tid',
   agentCoverageResult: 'acov',
+  githubInstallation: 'ghi',
+  githubPrCheck: 'ghpr',
 };
 
 /** Crockford base32, 26 chars — the ULID canonical form. */

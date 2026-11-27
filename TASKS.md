@@ -6,11 +6,11 @@ Executable form of [19 — Roadmap](docs/19-roadmap/README.md). Ordered by depen
 
 **What "done" means from M4 on:** `[x]` = implemented, with passing local tests (unit, contract, or loopback). It does **not** mean live-proven. Live proof is tracked only by the exit criteria and by the gate ledgers ([GATES-M4.md](GATES-M4.md), [GATES-M5.md](GATES-M5.md)). No M4–M7 exit criterion has passed yet, mainly because the live Compose proofs need Docker and provider keys, which this machine doesn't have.
 
-**130 tasks, 89 done, 8 partial** (as of 2026-11-26). Counts are derived from milestone and invariant checkboxes, including exit criteria; the five deferred items are excluded.
+**130 tasks, 91 done, 8 partial** (as of 2026-11-26). Counts are derived from milestone and invariant checkboxes, including exit criteria; the five deferred items are excluded.
 
 | | Phase 0 | M1 | M2 | M3 | M4 | M5 | M6 | M7 | Invariants |
 |---|---|---|---|---|---|---|---|---|---|
-| Done | 15 | 16 | 18 | 9 | 10 | 11 | 10 | 0 | 0 |
+| Done | 15 | 16 | 18 | 9 | 10 | 11 | 12 | 0 | 0 |
 | Partial | – | – | – | – | 3 | 0 | 2 | 3 | – |
 | Total | 15 | 16 | 18 | 9 | 15 | 14 | 16 | 19 | 8 |
 | Exit proven | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ❌ | ❌ | – |
@@ -199,12 +199,12 @@ Non-code work that blocks code. ADR-017 closes the provider decision; M4 impleme
 - [x] Fingerprint-scoped, never finding-ID-scoped
 - [x] Mandatory expiry — no permanent ignore (`max_duration_days`, default 30)
 - [x] Requester ≠ approver as configurable policy (`require_separate_approver`)
-- [~] Expiry warnings surfaced ~7 days ahead in report and integrations — `warn_before_expiry_days: 7` is in the policy and the CLI shows days remaining and the audit report flags waivers inside the window (`report-builder.ts`); the GitHub integrations that should also surface it aren't built
+- [x] Expiry warnings surfaced ~7 days ahead in report and integrations — `warn_before_expiry_days` (default 7) drives the report's ⚠ waiver table and the PR comment's waiver lines; the CLI shows days remaining
 
 ### Output
 - [x] Report generation following the skills' report structure, executive summary built last — `assurance/report/`: Markdown folder and JSON via `GET /audits/:id/report?format=json|markdown`, `kase report get --out`; golden-file tested, not yet run against a live audit (HTML not built)
-- [ ] GitHub App: PR comment, check run
-- [ ] GitHub Actions workflow and published action
+- [x] GitHub App: PR comment, check run — `integrations/github/`: signed webhook, PR → audit at head SHA → `Kase gate` check run (PARTIAL never `success`) with verified-only annotations, one comment upserted in place, OAuth-verified install binding, fork PRs off by default; contract-tested against a fake GitHub, not yet run against a real installation
+- [~] GitHub Actions workflow and published action — `.github/actions/kase-gate` (composite, exit codes follow the CLI, fails closed) and an example workflow in `docs/13-integrations/examples/`; not yet tagged or published
 - [x] `kase gate evaluate` with explainable output — cites rule, evidence, source location (also `kase gate show`; exit code follows the outcome)
 
 **Exit criteria**

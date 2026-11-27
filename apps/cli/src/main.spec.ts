@@ -178,3 +178,12 @@ test('report get refuses a server-supplied file name that could escape --out', a
   await assert.rejects(run(['report', 'get', '--audit', 'aud_1', '--out', 'unused'], env, { out: () => undefined, err: () => undefined }, sequenceFetch([response(evil)])), /Refusing report file name/);
   await assert.rejects(run(['report', 'get', '--audit', 'aud_1', '--format', 'html'], env, { out: () => undefined, err: () => undefined }, sequenceFetch([])), /markdown or json/);
 });
+
+test('a security audit needs no --target; smoke and full still do', async () => {
+  const bodies: string[] = [];
+  const responses = [response([{ id: 'prj_1', slug: 'acme' }]), response([{ id: 'repo_1', url: 'https://github.com/acme/web' }]), response({ id: 'aud_1', status: 'queued' })];
+  const fetcher = (async (url: RequestInfo | URL, init?: RequestInit) => { if (init?.body) bodies.push(String(init.body)); const next = responses.shift(); if (!next) throw new Error(`unexpected ${url}`); return next; }) as typeof fetch;
+  assert.equal(await run(['audit', 'start', '--project', 'acme', '--mode', 'security', '--commit', 'a'.repeat(40), '--json'], env, { out: () => undefined, err: () => undefined }, fetcher), 0);
+  assert.deepEqual(JSON.parse(bodies[0]), { repositoryId: 'repo_1', mode: 'security', commitSha: 'a'.repeat(40) });
+  await assert.rejects(run(['audit', 'start', '--project', 'acme', '--mode', 'full'], env, { out: () => undefined, err: () => undefined }, sequenceFetch([])), /--target is required/);
+});

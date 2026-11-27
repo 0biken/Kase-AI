@@ -8,6 +8,8 @@ import type { INestApplication } from '@nestjs/common';
  */
 export const ROUTE_BODY_LIMITS: ReadonlyArray<{ path: string; limit: string }> = [
   { path: '/api/v1/audits/:auditId/import/security-audit', limit: '10mb' },
+  // GitHub sends webhook payloads up to 25 MB; pull_request events with large bodies exceed 100kb.
+  { path: '/api/v1/integrations/github/webhook', limit: '25mb' },
 ];
 
 type Middleware = (req: unknown, res: unknown, next: (error?: unknown) => void) => void;
@@ -25,8 +27,9 @@ export function applyRouteBodyLimits(app: INestApplication): void {
  */
 function expressJson(options: { limit: string }): Middleware {
   const express = require(require.resolve('express', { paths: [require.resolve('@nestjs/platform-express')] })) as {
-    json(o: { limit: string }): Middleware;
+    json(o: { limit: string; verify?: (req: { rawBody?: Buffer }, res: unknown, buf: Buffer) => void }): Middleware;
   };
-  const parse = express.json(options);
+  // Keep the raw bytes, as Nest's own parser does with `rawBody: true`, so signature checks still work.
+  const parse = express.json({ ...options, verify: (req, _res, buf) => { req.rawBody = buf; } });
   return function routeScopedJsonParser(req, res, next) { parse(req, res, next); };
 }

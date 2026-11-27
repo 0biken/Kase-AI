@@ -31,6 +31,8 @@ model Project {
   evidenceRetentionOverride ProjectEvidenceRetentionOverride?
   aiConfiguration    ProjectAiConfiguration?
   testIdentities     TestIdentity[]
+  githubInstallations GithubInstallation[]
+  githubConfig       GithubIntegrationConfig?
 }
 
 model Repository {
@@ -124,6 +126,7 @@ model Audit {
   agentRuns          AgentRun[]
   coverageResults    AgentCoverageResult[]
   codeMap            CodeMap?
+  githubPrCheck      GithubPrCheck?
 
   @@unique([projectId, idempotencyKey])
   @@index([projectId, startedAt])
@@ -1038,4 +1041,69 @@ model AgentCoverageResult {
   audit                Audit    @relation(fields: [auditId], references: [id], onDelete: Cascade)
 
   @@unique([auditId, agentRole, category])
+}
+
+// ---------------------------------------------------------------------------
+// GitHub App (13-integrations §1, M6 G7)
+//
+// An installation is bound to exactly one project, and only after the
+// installing GitHub user is shown (via OAuth) to have access to it. Without
+// that check, a project could register someone else's repository URL and
+// receive their pull-request code. The app's private key is platform
+// configuration, never stored here.
+// ---------------------------------------------------------------------------
+
+model GithubInstallation {
+  id             String   @id
+  projectId      String
+  /// GitHub's numeric installation id, kept as text.
+  installationId String   @unique
+  accountLogin   String
+  installedBy    String
+  createdAt      DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id])
+
+  @@index([projectId])
+}
+
+/// How pull requests in this project's repositories are audited.
+model GithubIntegrationConfig {
+  projectId        String   @id
+  mode             String   @default("security") // 'security' | 'full'
+  targetId         String?
+  /// PARTIAL is `neutral` by default; true makes it `failure`. It is never `success`.
+  partialIsFailure Boolean  @default(false)
+  /// Fork PRs carry untrusted code into agents, so they are off by default.
+  auditForks       Boolean  @default(false)
+  updatedBy        String
+  updatedAt        DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id])
+}
+
+/// One audit started for one pull-request head, and the check run and comment it publishes.
+model GithubPrCheck {
+  id             String    @id
+  auditId        String    @unique
+  projectId      String
+  installationId String
+  owner          String
+  repo           String
+  prNumber       Int
+  headSha        String
+  checkRunId     String?
+  commentId      String?
+  state          String    // 'pending' | 'completing' | 'completed' | 'failed'
+  conclusion     String?
+  attempts       Int       @default(0)
+  lastError      String?
+  leaseUntil     DateTime?
+  createdAt      DateTime  @default(now())
+  completedAt    DateTime?
+
+  audit Audit @relation(fields: [auditId], references: [id])
+
+  @@index([state])
+  @@index([projectId, owner, repo, prNumber])
 }

@@ -1,6 +1,6 @@
 # Gates: M6 release assurance
 
-Scope: the vertical slice blocks a PR and explains itself ([19 §3 M6](docs/19-roadmap/README.md), [12 — Policy gate](docs/12-policy-gate/README.md)). The gate engine, policy CRUD, evaluation service and waivers are implemented (`47e8f74`, `fab9e90`, `9fe2706`, `cfb4825`, `cc6a6e4`). Live replay, report generation, the GitHub App and the PR exit proof are still to come. Full milestone completion needs every gate below. Local green tests never close G5–G8.
+Scope: the vertical slice blocks a PR and explains itself ([19 §3 M6](docs/19-roadmap/README.md), [12 — Policy gate](docs/12-policy-gate/README.md)). The gate engine, policy CRUD, evaluation service and waivers are implemented (`47e8f74`, `fab9e90`, `9fe2706`, `cfb4825`, `cc6a6e4`). Report generation is implemented, and the GitHub App and Action are implemented and contract-tested against a fake GitHub. Live replay, a live GitHub run and the PR exit proof are still to come. Full milestone completion needs every gate below. Local green tests never close G5–G8.
 
 ## Ledger opened — 26 November 2026
 
@@ -40,7 +40,7 @@ Docker's Linux engine is unavailable on this machine, so G5 and G8 have no live 
   EVIDENCE: 2026-11-26; exit 0; 18 API tests (golden executive summary, summary-last index, must-fix ranking, expiry warning, escaping, service and route) and 18 CLI tests passed; KASE_M6_REPORT_VERIFIED
 
 - [ ] G7: the GitHub App creates a check run (PARTIAL is never `success`) and one upserted PR comment citing rule, evidence and source location; the published Action exits on the gate outcome
-  EVIDENCE: pending; not implemented
+  EVIDENCE: pending live run against a real GitHub App installation, which needs a registered app and a reachable Kase API. Local contract proof on 2026-11-27: `node scripts/verify-m6-github.mjs` exited 0 with 46 API tests and 8 Action tests passing (KASE_M6_GITHUB_VERIFIED). That covers the PARTIAL→neutral/failure mapping, verified-only annotations, the golden PR comment, own-app-only comment upsert, webhook HMAC, install-state and OAuth binding, retry and give-up, and Action exit codes 0/1/2 with fail-closed errors.
 
 - [ ] G8: a fixture PR carrying the IDOR is blocked with an actionable explanation, and pushing the one-token ownership fix flips the same PR to green
   EVIDENCE: pending; needs G5, G7 and M5 G4

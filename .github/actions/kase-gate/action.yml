@@ -1,0 +1,101 @@
+name: Kase gate
+description: Run a Kase audit for this commit and fail the job on the release-gate outcome.
+author: Kase
+
+inputs:
+  api-url:
+    description: Kase API base URL, e.g. https://kase.example.com/api/v1
+    required: true
+  api-token:
+    description: Kase API token (store it as a repository secret)
+    required: true
+  project:
+    description: Kase project slug or id
+    required: true
+  target:
+    description: Target name or id. Required for full audits; a security audit reads only the repository.
+    required: false
+    default: ''
+  repository:
+    description: Repository id or URL, when the project has more than one
+    required: false
+    default: ''
+  mode:
+    description: security (repository only) or full (repository plus the running target)
+    required: false
+    default: security
+  commit:
+    description: The commit being audited. Supplies verified build provenance; without it correlated findings cannot block.
+    required: false
+    default: ${{ github.event.pull_request.head.sha || github.sha }}
+  categories:
+    description: Comma-separated categories, if not the mode's default
+    required: false
+    default: ''
+  budget-minutes:
+    description: Wall-clock budget for the audit, 1 to 90 minutes
+    required: false
+    default: ''
+  fail-on:
+    description: Which outcomes fail the job, comma-separated from fail and partial ("none" never fails)
+    required: false
+    default: fail,partial
+  report-dir:
+    description: Where to write the Markdown report ("" to skip)
+    required: false
+    default: kase-report
+
+outputs:
+  outcome:
+    description: pass, fail or partial
+    value: ${{ steps.gate.outputs.outcome }}
+  audit-id:
+    description: The Kase audit id
+    value: ${{ steps.gate.outputs.audit-id }}
+  report-url:
+    description: API URL of the Markdown report
+    value: ${{ steps.gate.outputs.report-url }}
+  blocking-count:
+    description: Number of findings blocking the release
+    value: ${{ steps.gate.outputs.blocking-count }}
+  critical-count:
+    description: Number of blocking findings at critical severity
+    value: ${{ steps.gate.outputs.critical-count }}
+  degraded:
+    description: true when the audit ran degraded
+    value: ${{ steps.gate.outputs.degraded }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: 22
+
+    # Build the CLI from this action's own checkout; --ignore-scripts so no
+    # dependency runs install hooks on the runner.
+    - name: Build the Kase CLI
+      shell: bash
+      run: |
+        cd "$GITHUB_ACTION_PATH/../../../apps/cli"
+        npm install --no-audit --no-fund --no-package-lock --ignore-scripts
+        npm run build
+
+    # Inputs reach the script through env only, never interpolated into the
+    # shell, so a crafted branch or input value cannot inject a command.
+    - name: Run the Kase gate
+      id: gate
+      shell: bash
+      run: node "$GITHUB_ACTION_PATH/run.mjs"
+      env:
+        KASE_API_URL: ${{ inputs.api-url }}
+        KASE_TOKEN: ${{ inputs.api-token }}
+        KASE_PROJECT: ${{ inputs.project }}
+        KASE_TARGET: ${{ inputs.target }}
+        KASE_REPOSITORY: ${{ inputs.repository }}
+        KASE_MODE: ${{ inputs.mode }}
+        KASE_COMMIT: ${{ inputs.commit }}
+        KASE_CATEGORIES: ${{ inputs.categories }}
+        KASE_BUDGET_MINUTES: ${{ inputs.budget-minutes }}
+        KASE_FAIL_ON: ${{ inputs.fail-on }}
+        KASE_REPORT_DIR: ${{ inputs.report-dir }}
